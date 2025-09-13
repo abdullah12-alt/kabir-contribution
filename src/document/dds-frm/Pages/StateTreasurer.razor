@@ -1,0 +1,537 @@
+@page "/state-treasurer"
+@using Client.Models
+@using Microsoft.AspNetCore.Components.Routing
+@using Client.Services
+@inject StateTreasurerService StateTreasurerService
+@inject NotificationService NotificationService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+
+<NavigationLock OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+<h3 style="margin-bottom:23px;">State Treasurer</h3>
+
+<div class="container">
+    <RadzenFieldset Text="Process Information" Style="margin-top:14px;">
+        <div class="row">
+            <div class="half">
+                <RadzenLabel Text="Date to Send" Component="DateToSendBox" Style="display:block; margin-bottom:4px;" />
+                <RadzenDatePicker @bind-Value="processRequest.Dsn.PostedDate" DateFormat="MM/dd/yyyy" Style="width:100%" id="DateToSendBox" />
+            </div>
+            <div class="half">
+                <RadzenLabel Text="Process Date" Component="ProcessDateBox" Style="display:block; margin-bottom:4px;" />
+                <RadzenDatePicker @bind-Value="processRequest.Dsn.ProcessDate" DateFormat="MM/dd/yyyy" Style="width:100%" id="ProcessDateBox" />
+            </div>
+        </div>
+        <div class="row">
+            <div class="half">
+                <RadzenLabel Text="Deposit Sequence Number (DSN)" Component="DsnBox" Style="display:block; margin-bottom:4px;" />
+                <RadzenTextBox @bind-Value="processRequest.Dsn.DepSeqNum" Name="DSN" Placeholder="Enter DSN if required" Style="width:100%" id="DsnBox" />
+                <RadzenLabel Text="Leave blank if no DSN required" Style="display:block; margin-top:2px; font-size:12px; color:#666;" />
+            </div>
+            <div class="half">
+                <RadzenLabel Text="Send ALOGS" Component="SendAlogsBox" Style="display:block; margin-bottom:4px;" />
+                <RadzenCheckBox @bind-Value="processRequest.SendAlogs" Style="margin-top:8px;" />
+                <RadzenLabel Text="Include ALOG files in email" Style="display:block; margin-top:2px; font-size:12px; color:#666;" />
+            </div>
+        </div>
+    </RadzenFieldset>
+
+    <RadzenFieldset Text="Status Information" Style="margin-top:14px;">
+        <div class="status-grid">
+            <div class="status-item">
+                <RadzenLabel Text="Has Transactions:" Style="font-weight:bold;" />
+                <span class="status-value @(status?.HasTransactions == true ? "status-yes" : "status-no")">
+                    @(status?.HasTransactions == true ? "Yes" : "No")
+                </span>
+            </div>
+            <div class="status-item">
+                <RadzenLabel Text="Has Incomplete Send:" Style="font-weight:bold;" />
+                <span class="status-value @(status?.HasIncompleteSend == true ? "status-yes" : "status-no")">
+                    @(status?.HasIncompleteSend == true ? "Yes" : "No")
+                </span>
+            </div>
+            <div class="status-item">
+                <RadzenLabel Text="DSN Required:" Style="font-weight:bold;" />
+                <span class="status-value @(status?.IsDsnRequired == true ? "status-yes" : "status-no")">
+                    @(status?.IsDsnRequired == true ? "Yes" : "No")
+                </span>
+            </div>
+        </div>
+        <RadzenButton Text="Check Status" Click="@CheckStatus" Style="background-color: #6c757d; color: white; margin-top: 8px;" />
+    </RadzenFieldset>
+
+    <RadzenFieldset Text="Daily Totals" Style="margin-top:14px;">
+        <div class="totals-grid">
+            <div class="total-item">
+                <RadzenLabel Text="PA Amount:" Style="font-weight:bold;" />
+                <span class="amount-value">@(totals?.TotalPAAmt.ToString("C") ?? "N/A")</span>
+            </div>
+            <div class="total-item">
+                <RadzenLabel Text="PF Amount:" Style="font-weight:bold;" />
+                <span class="amount-value">@(totals?.TotalPFAmt.ToString("C") ?? "N/A")</span>
+            </div>
+        </div>
+        <RadzenButton Text="Get Totals" Click="@GetTotals" Style="background-color: #6c757d; color: white; margin-top: 8px;" />
+    </RadzenFieldset>
+
+    <RadzenFieldset Text="Prior DSNs" Style="margin-top:14px;">
+        <RadzenDataGrid Data="@priorDsns" TItem="DsnItem" AllowPaging="true" PageSize="10" Style="margin-top:8px;">
+            <Columns>
+                <RadzenDataGridColumn TItem="DsnItem" Property="DepSeqNum" Title="DSN Number" Width="200px" />
+                <RadzenDataGridColumn TItem="DsnItem" Property="PostedDate" Title="Posted Date" Width="200px" FormatString="{0:MM/dd/yyyy}" />
+            </Columns>
+        </RadzenDataGrid>
+        <RadzenButton Text="Refresh DSNs" Click="@GetPriorDsns" Style="background-color: #6c757d; color: white; margin-top: 8px;" />
+    </RadzenFieldset>
+
+    <RadzenFieldset Text="Actions" Style="margin-top:14px;">
+        <div class="action-buttons">
+            <RadzenButton Text="Process & Send" Click="@ProcessAndSend" ButtonType="Radzen.ButtonType.Submit" 
+                         Style="background-color: #007BFF; color: white; margin-right: 8px;" 
+                         Disabled="@(!CanProcess())" />
+            <RadzenButton Text="Generate Files Only" Click="@GenerateFilesOnly" 
+                         Style="background-color: #28a745; color: white; margin-right: 8px;" />
+            <RadzenButton Text="Download PA File" Click="@DownloadPaFile" 
+                         Style="background-color: #17a2b8; color: white; margin-right: 8px;" />
+            <RadzenButton Text="Download PF File" Click="@DownloadPfFile" 
+                         Style="background-color: #17a2b8; color: white;" />
+        </div>
+    </RadzenFieldset>
+
+    @if (isProcessing)
+    {
+        <RadzenFieldset Text="Processing Status" Style="margin-top:14px;">
+            <div class="processing-status">
+                <RadzenProgressBar Value="@processingProgress" Style="width:100%; margin-bottom:8px;" />
+                <RadzenLabel Text="@processingMessage" Style="text-align:center; display:block;" />
+            </div>
+        </RadzenFieldset>
+    }
+
+    @if (processResponse != null)
+    {
+        <RadzenFieldset Text="Process Results" Style="margin-top:14px;">
+            <div class="result-summary">
+                <RadzenLabel Text="Status:" Style="font-weight:bold;" />
+                <span class="result-status @(processResponse.Success ? "status-success" : "status-error")">
+                    @(processResponse.Success ? "Success" : "Failed")
+                </span>
+            </div>
+            <div class="result-message">
+                <RadzenLabel Text="Message:" Style="font-weight:bold;" />
+                <span>@processResponse.Message</span>
+            </div>
+            @if (processResponse.Files != null)
+            {
+                <div class="file-info">
+                    <RadzenLabel Text="Generated Files:" Style="font-weight:bold;" />
+                    <ul>
+                        <li>@processResponse.Files.PaFileName</li>
+                        <li>@processResponse.Files.PfFileName</li>
+                    </ul>
+                </div>
+            }
+            @if (processResponse.EmailResponse != null)
+            {
+                <div class="email-info">
+                    <RadzenLabel Text="Email Results:" Style="font-weight:bold;" />
+                    <div class="email-details">
+                        <div>Sent to: @string.Join(", ", processResponse.EmailResponse.SentTo)</div>
+                        <div>Attachments: @string.Join(", ", processResponse.EmailResponse.Attachments)</div>
+                    </div>
+                </div>
+            }
+        </RadzenFieldset>
+    }
+</div>
+
+<RadzenNotification />
+
+<style>
+    .rz-fieldset-legend-text {
+        font-size: 16px;
+    }
+
+    .container {
+        margin-left: 0px;
+        padding-left: 0px;
+    }
+
+    .rz-fieldset {
+        margin-top: 14px;
+    }
+
+    .rz-label {
+        font-size: 14px;
+    }
+
+    .row {
+        display: flex;
+        margin-bottom: 8px;
+    }
+
+    .half {
+        width: 50%;
+    }
+
+    .status-grid, .totals-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    .status-item, .total-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+    }
+
+    .status-value {
+        font-weight: bold;
+        padding: 4px 8px;
+        border-radius: 4px;
+        min-width: 40px;
+        text-align: center;
+    }
+
+    .status-yes {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .status-no {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+
+    .amount-value {
+        font-weight: bold;
+        color: #007bff;
+    }
+
+    .action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .processing-status {
+        text-align: center;
+        padding: 16px;
+    }
+
+    .result-summary, .result-message, .file-info, .email-info {
+        margin-bottom: 12px;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+    }
+
+    .result-status {
+        font-weight: bold;
+        padding: 4px 8px;
+        border-radius: 4px;
+        margin-left: 8px;
+    }
+
+    .status-success {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .status-error {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+
+    .email-details {
+        margin-top: 4px;
+        font-size: 14px;
+        color: #666;
+    }
+
+    ul {
+        margin: 4px 0;
+        padding-left: 20px;
+    }
+
+    li {
+        margin: 2px 0;
+    }
+</style>
+
+@code {
+    private ProcessRequest processRequest = new()
+    {
+        Dsn = new InsertDsnRequest
+        {
+            PostedDate = DateTime.Today,
+            ProcessDate = DateTime.Today
+        },
+        SendAlogs = true
+    };
+
+    private StateTreasurerStatusDto? status;
+    private DailyTotals? totals;
+    private List<DsnItem> priorDsns = new();
+    private ProcessResponse? processResponse;
+    private bool isProcessing = false;
+    private int processingProgress = 0;
+    private string processingMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetPriorDsns();
+        await CheckStatus();
+        await GetTotals();
+    }
+
+    private async Task CheckStatus()
+    {
+        try
+        {
+            status = await StateTreasurerService.GetStatusAsync(processRequest.Dsn.PostedDate);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to check status: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private async Task GetTotals()
+    {
+        try
+        {
+            totals = await StateTreasurerService.GetTotalsAsync(processRequest.Dsn.PostedDate);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to get totals: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private async Task GetPriorDsns()
+    {
+        try
+        {
+            var dsns = await StateTreasurerService.GetPriorDsnsAsync();
+            priorDsns = dsns.ToList();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to get prior DSNs: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private async Task ProcessAndSend()
+    {
+        if (!CanProcess()) return;
+
+        isProcessing = true;
+        processingProgress = 0;
+        processingMessage = "Starting process...";
+
+        try
+        {
+            processingProgress = 25;
+            processingMessage = "Processing request...";
+            StateHasChanged();
+
+            processResponse = await StateTreasurerService.ProcessAsync(processRequest);
+
+            processingProgress = 100;
+            processingMessage = "Process completed";
+            StateHasChanged();
+
+            if (processResponse.Success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Success",
+                    Detail = "State Treasurer process completed successfully.",
+                    Duration = 4000
+                });
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Process Completed with Issues",
+                    Detail = processResponse.Message,
+                    Duration = 6000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Process failed: {ex.Message}",
+                Duration = 6000
+            });
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GenerateFilesOnly()
+    {
+        if (!CanProcess()) return;
+
+        try
+        {
+            var fileReq = new FileGenerationRequest
+            {
+                PostedDate = processRequest.Dsn.PostedDate,
+                ProcessDate = processRequest.Dsn.ProcessDate,
+                DepSeqNum = processRequest.Dsn.DepSeqNum
+            };
+
+            var files = await StateTreasurerService.GenerateFilesAsync(fileReq);
+
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Files Generated",
+                Detail = $"PA and PF files generated successfully. PA Total: {files.Totals.TotalPAAmt:C}, PF Total: {files.Totals.TotalPFAmt:C}",
+                Duration = 4000
+            });
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to generate files: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private async Task DownloadPaFile()
+    {
+        if (!CanProcess()) return;
+
+        try
+        {
+            var fileReq = new FileGenerationRequest
+            {
+                PostedDate = processRequest.Dsn.PostedDate,
+                ProcessDate = processRequest.Dsn.ProcessDate,
+                DepSeqNum = processRequest.Dsn.DepSeqNum
+            };
+
+            var files = await StateTreasurerService.GenerateFilesAsync(fileReq);
+            await JSRuntime.InvokeVoidAsync("downloadFile", files.PaFileContent, files.PaFileName, "text/plain");
+
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Download Complete",
+                Detail = "PA file downloaded successfully.",
+                Duration = 3000
+            });
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to download PA file: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private async Task DownloadPfFile()
+    {
+        if (!CanProcess()) return;
+
+        try
+        {
+            var fileReq = new FileGenerationRequest
+            {
+                PostedDate = processRequest.Dsn.PostedDate,
+                ProcessDate = processRequest.Dsn.ProcessDate,
+                DepSeqNum = processRequest.Dsn.DepSeqNum
+            };
+
+            var files = await StateTreasurerService.GenerateFilesAsync(fileReq);
+            await JSRuntime.InvokeVoidAsync("downloadFile", files.PfFileContent, files.PfFileName, "text/plain");
+
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Download Complete",
+                Detail = "PF file downloaded successfully.",
+                Duration = 3000
+            });
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to download PF file: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private bool CanProcess()
+    {
+        return processRequest.Dsn.PostedDate != default &&
+               processRequest.Dsn.ProcessDate != default &&
+               !isProcessing;
+    }
+
+    private async Task OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        if (isProcessing)
+        {
+            var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "A process is currently running. Do you really want to leave this page?");
+            if (!confirmed)
+            {
+                context.PreventNavigation();
+            }
+        }
+    }
+}
