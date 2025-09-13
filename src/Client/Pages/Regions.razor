@@ -1,0 +1,213 @@
+﻿@page "/settings/regions"
+@using Client.Components.Dialogs
+@using Client.Models
+@using Client.Services
+@inject RegionService RegionService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<h3>Regions</h3>
+
+<div class="container">
+    <div style="display: flex; justify-content: end;">
+        <RadzenButton Text="Add New" Icon="add"
+                      Click="@OnAdd" ButtonStyle="ButtonStyle.Secondary"
+                      Style="background-color: #007BFF; color: white;margin-bottom: 16px;" />
+    </div>
+
+    <RadzenDataGrid TItem="RegionDto" Data="@regions" @ref="grid"
+                    AllowPaging="true" PageSize="25" AllowSorting="true">
+        <Columns>
+            <RadzenDataGridColumn TItem="RegionDto" Property="Region" Title="Region" Width="180px" />
+            @* <RadzenDataGridColumn TItem="RegionDto" Property="EmailRecipientsTo" Title="Email Recipients To" Width="280px" /> *@
+            <RadzenDataGridColumn TItem="RegionDto" Title="Email Recipients To" Width="300px">
+                <Template Context="record">
+                    <div style="white-space: normal; word-break: break-word;">
+                        @record.EmailRecipientsTo
+                    </div>
+                </Template>
+            </RadzenDataGridColumn>
+
+            @* <RadzenDataGridColumn TItem="RegionDto" Property="EmailRecipientsCc" Title="Email Recipients Cc" Width="280px" /> *@
+            <RadzenDataGridColumn TItem="RegionDto" Title="Email Recipients Cc" Width="300px">
+                <Template Context="record">
+                    <div style="white-space: normal; word-break: break-word;">
+                        @record.EmailRecipientsCc
+                    </div>
+                </Template>
+            </RadzenDataGridColumn>
+
+            @* <RadzenDataGridColumn TItem="RegionDto" Property="LastModBy" Title="Modified By" Width="180px" /> *@
+            <RadzenDataGridColumn TItem="RegionDto" Property="LastModDatetime" Title="Modified On" Width="180px"  FormatString="{0:yyyy-MM-dd HH:mm}" />
+
+            <RadzenDataGridColumn TItem="RegionDto" Title="Actions" Width="180px">
+                <Template Context="record">
+               <div style="display: flex; justify-content: center; align-items: center;">
+
+                    <div class="row-actions">
+                        <RadzenButton Icon="edit"
+                                      ButtonStyle="ButtonStyle.Secondary"
+                                      Click="@(args => OnEdit(record))"
+                                      style="margin-right: 6px;" title="Edit Region" />
+                        <RadzenButton Icon="delete"
+                                      ButtonStyle="ButtonStyle.Danger"
+                                      Click="@(args => OnDelete(record))"
+                                      title="Delete Region" />
+                    </div>
+                    </div>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+
+    <RadzenNotification />
+</div>
+
+<style>
+    /* Header font size */
+    .rz-datatable-header th,
+    .rz-grid-table thead th {
+        font-size: 18px !important;
+    }
+
+    /* Row content font size */
+    .rz-grid-table td,
+    .rz-cell-data {
+        font-size: 16px !important;
+    }
+
+    /* Smaller icon buttons for Actions column */
+    .row-actions .rz-button {
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+        min-width: auto !important;
+        height: 32px !important;
+    }
+
+        .row-actions .rz-button .rz-button-icon {
+            font-size: 12px !important;
+        }
+    /* All Radzen DataGrid header titles */
+    .rz-column-title {
+        font-size: 20px !important;
+        text-align: center;
+    }
+
+    /* .rz-pager { */
+    /*     justify-content: center !important; */
+    /* } */
+
+    .rz-grid-table thead th .rz-column-title {
+        justify-content: center;
+    }
+
+    /* .rz-cell-data {
+        /*     text-align: center; */
+    /* } */
+    .container {
+        margin-left: 0px;
+        padding-left: 0px;
+    }
+
+    h3 {
+        margin-bottom: -0.9rem;
+    }
+
+    .rz-datagrid {
+        font-size: 0.95rem;
+    }
+
+    .row-actions {
+        display: flex;
+        justify-content: center;
+    }
+
+    .rz-grid-table thead th .rz-column-title-content {
+        text-transform: none; /* disables uppercase */
+        padding: 4px;
+    }
+</style>
+
+@code {
+    private List<RegionDto> regions = new();
+    private RadzenDataGrid<RegionDto>? grid;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRegionsAsync();
+    }
+
+    private async Task LoadRegionsAsync()
+    {
+        regions = await RegionService.GetAllAsync();
+    }
+
+    private async Task OnAdd()
+    {
+        var result = await DialogService.OpenAsync<EditRegionDialog>(
+            "Add Region",
+            new Dictionary<string, object> { ["Region"] = new RegionDto() },
+            new DialogOptions
+                {
+                    Width = "600px",
+                    Height = "500px",
+                    Resizable = true,
+                    CssClass = "dialog-scroll-fix"
+                });
+
+        if (result is RegionDto)
+        {
+            await LoadRegionsAsync();
+        }
+    }
+
+    private async Task OnEdit(RegionDto record)
+    {
+        var result = await DialogService.OpenAsync<EditRegionDialog>(
+            "Edit Region",
+            new Dictionary<string, object> { ["Region"] = record },
+            new DialogOptions
+                {
+                    Width = "600px",
+                    Height = "500px",
+                    Resizable = true,
+                    CssClass = "dialog-scroll-fix"
+                });
+
+        if (result is RegionDto)
+        {
+            await LoadRegionsAsync();
+        }
+    }
+
+    private async Task OnDelete(RegionDto record)
+    {
+        bool? confirmed = await DialogService.Confirm($"Are you sure you want to delete region '{record.Region}'?", "Delete Confirmation");
+
+        if (confirmed == true)
+        {
+            bool success = await RegionService.DeleteAsync(record.RegionId);
+            if (success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Deleted",
+                        Detail = $"Region '{record.Region}' has been deleted.",
+                        Duration = 4000
+                    });
+                await LoadRegionsAsync();
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Delete Failed",
+                        Detail = "The server was unable to delete the record.",
+                        Duration = 4000
+                    });
+            }
+        }
+    }
+}

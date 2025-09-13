@@ -1,0 +1,164 @@
+﻿@page "/settings/dd-configuration"
+@using Client.Models
+@using Microsoft.AspNetCore.Components.Routing
+
+@using Client.Services
+@inject DDConfigService DDConfigService
+@inject NotificationService NotificationService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+
+<NavigationLock OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+<h3 style="margin-bottom:23px;">DDS Configuration</h3>
+
+
+    <div class="container">
+        <EditForm Model="@config" OnValidSubmit="OnSave" OnFieldChanged="@(() => hasUnsavedChanges = true)">
+            <RadzenTemplateForm TItem="IncomeSourceType" Context="formContext">
+
+                <RadzenFieldset Text="Patient Account Vender ID" >
+                <RadzenLabel Text="PA Vendor ID" Component="PaVendorIdBox" Style="display:block; margin-bottom:4px; margin-top:5px;" />
+                <RadzenTextBox @bind-Value="config.PA_VENDOR_ID_NUM" Name="Vendor ID Number" Placeholder="Vendor ID Number" Style="width:60%" id="PaVendorIdBox" />
+            </RadzenFieldset>
+            <RadzenFieldset Text="FUNB IDs" Style="margin-top:20px;">
+                <div class="row">
+                    <div class="half">
+                        <RadzenLabel Text="Sender ID" Component="SenderIdBox" Style="display:block; margin-bottom:4px;" />
+                        <RadzenTextBox @bind-Value="config.SENDER_ID" Name="Sender ID" Placeholder="Sender ID" Style="width:100%" id="SenderIdBox" />
+                    </div>
+                    <div class="half">
+                        <RadzenLabel Text="Receiver ID" Component="ReceiverIdBox" Style="display:block; margin-bottom:4px;" />
+                        <RadzenTextBox @bind-Value="config.RECEIVER_ID" Name="Receiver ID" Placeholder="Receiver ID" Style="width:100%" id="ReceiverIdBox" />
+                    </div>
+                </div>
+            </RadzenFieldset>
+            <RadzenFieldset Text="Patient Account Posting Information">
+                <div class="row">
+                    <div class="half">
+                        <RadzenLabel Text="Insurance Code" Component="InsuranceCodeBox" Style="display:block; margin-bottom:4px;" />
+                        <RadzenTextBox @bind-Value="config.FT1_INSURANCE_CODE" Name="Insurance Code" Placeholder="Insurance Code" Style="width:100%" id="InsuranceCodeBox" />
+                    </div>
+                    <div class="half">
+                        <RadzenLabel Text="PAT Code Entering Area" Component="PatCodeBox" Style="display:block; margin-bottom:4px;" />
+                        <RadzenTextBox @bind-Value="config.PATCODE_ENTERING_AREA" Name="PAT Code Entering Area" Placeholder="PAT Code Entering Area" Style="width:100%" id="PatCodeBox" />
+                    </div>
+                </div>
+            </RadzenFieldset>
+            <RadzenFieldset Text="Affinity Data Acquisition Information" class="hidden-field">
+                <div class="row">
+                    <div class="half">
+                        <RadzenLabel Text="Data Refresh (minutes)" Component="DataRefreshBox" Style="display:block; margin-bottom:4px;" />
+                        <RadzenNumeric @bind-Value="config.DATA_REFRESH_RATE" Name="Data Refresh (minutes)" Placeholder="Data Refresh (minutes)" Style="width:100%" id="DataRefreshBox" />
+                    </div>
+                    <div class="half">
+                        <RadzenLabel Text="Visit Lookback (months)" Component="LookbackBox" Style="display:block; margin-bottom:4px;" />
+                        <RadzenNumeric @bind-Value="config.DATA_LOOKBACK" Name="Visit Lookback (months)" Placeholder="Visit Lookback (months)" Style="width:100%" id="LookbackBox" />
+                    </div>
+                </div>
+            </RadzenFieldset>
+            <RadzenFieldset Text="State Treasurer Information">
+
+                <div class ="hidden-field">
+                <RadzenLabel Text="PA Vendor ID" Component="PaVendorIdBox" Style="display:block; margin-bottom:4px; margin-top:8px;" class="hidden-field" />
+                <RadzenTextBox @bind-Value="config.PA_VENDOR_ID_NUM" Name="PA Vendor ID" Placeholder="PA Vendor ID" Style="width:100%" id="PaVendorIdBox" class="hidden-field" />
+                <RadzenLabel Text="PA Batch Name" Component="PaBatchNameBox" Style="display:block; margin-bottom:4px; margin-top:8px;" class="hidden-field" />
+                <RadzenTextBox @bind-Value="config.PA_BATCH_NAME" Name="PA Batch Name" Placeholder="PA Batch Name" Style="width:100%" id="PaBatchNameBox" class="hidden-field"  />
+                <RadzenLabel Text="PF Batch Name" Component="PfBatchNameBox" Style="display:block; margin-bottom:4px; margin-top:8px;" class="hidden-field" />
+                <RadzenTextBox @bind-Value="config.PF_BATCH_NAME" Name="PF Batch Name" Placeholder="PF Batch Name" Style="width:100%" id="PfBatchNameBox" class="hidden-field" />
+                   </div>
+                <RadzenLabel Text="To" Component="ToBox" Style="display:block; margin-bottom:4px; margin-top:8px;" />
+                    <RadzenTextBox @bind-Value="config.ST_TREAS_EMAIL_TO_ADDR" Name="To" Placeholder="To" Style="width:60%" id="ToBox" />
+                <RadzenLabel Text="CC" Component="CcBox" Style="display:block; margin-bottom:4px; margin-top:8px;" />
+                    <RadzenTextBox @bind-Value="config.ST_TREAS_EMAIL_CC_ADDR" Name="CC" Placeholder="CC" Style="width:60%" id="CcBox" />
+                <RadzenLabel Text="Subject" Component="SubjectBox" Style="display:block; margin-bottom:4px; margin-top:8px;" />
+                    <RadzenTextBox @bind-Value="config.ST_TREAS_EMAIL_SUBJ" Name="Subject" Placeholder="Subject" Style="width:60%" id="SubjectBox" />
+                <RadzenLabel Text="Text" Component="TextBox" Style="display:block; margin-bottom:4px; margin-top:8px; " />
+                <RadzenTextArea @bind-Value="config.ST_TREAS_EMAIL_TEXT" Name="Text" Placeholder="Text" Style="width:100%" Rows="4" id="TextBox" />
+            </RadzenFieldset>
+            <RadzenButton Text="Save" Click="@OnSave" ButtonType="Radzen.ButtonType.Submit" Style="background-color: #007BFF; color: white;margin-top: 16px; width:112px;" />
+        </RadzenTemplateForm>
+    </EditForm>
+    </div>
+
+
+<RadzenNotification />
+
+<style>
+    .rz-fieldset-legend-text {
+        font-size: 16px;
+    }
+
+    .container {
+        margin-left: 0px;
+        padding-left: 0px;
+    }
+    .rz-fieldset{
+        margin-top:14px;
+    }
+
+    .rz-label {
+        font-size: 14px;
+    }    .row {
+        display: flex;
+        /* gap: 16px; */
+        margin-bottom: 8px;
+    }
+
+    .half {
+        width: 50%;
+    }
+
+    .hidden-field {
+        display: none;
+    }
+
+</style>
+@code {
+    private DDConfigInfo? config;
+    private bool hasUnsavedChanges = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        config = await DDConfigService.GetConfigAsync();
+    }
+
+    private async Task OnSave()
+    {
+        bool success = await DDConfigService.UpdateConfigAsync(config!, "U");
+        if (success)
+        {
+            hasUnsavedChanges = false;
+
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Saved",
+                    Detail = "Configuration saved successfully.",
+                    Duration = 4000
+                });
+        }
+        else
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Save Failed",
+                    Detail = "The server was unable to save the configuration.",
+                    Duration = 4000
+                });
+        }
+    }
+
+    private async Task OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        if (hasUnsavedChanges)
+        {
+            var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "You have unsaved changes. Do you really want to leave this page?");
+            if (!confirmed)
+            {
+                context.PreventNavigation();
+            }
+        }
+    }
+
+}

@@ -1,0 +1,1929 @@
+﻿@page "/preedit"
+@using Client.TabController
+@using Radzen
+@using Radzen.Blazor
+@inject DialogService DialogService
+@inject HttpClient Http
+@using Client.Components.Dialogs
+@using Client.Services;
+@inject PreEditService PreEditService
+@inject NotificationService NotificationService
+@inject NotificationService NotificationService
+@inject NavigationManager Navigation
+@inject FileloadService FileloadService
+@inject NavigationManager Navigation
+@inject LookupApiService LookupService
+
+<div class="pre-edit-header">
+    <h3>Pre-Edit File</h3>
+    <div style="display: flex; justify-content: center; margin-bottom: 20px; position: relative;">
+        <i class="fa fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: gray;"></i>
+        <RadzenTextBox Placeholder="Search..."
+                       Style="width: 300px; padding-left: 30px;"
+                       @bind-Value="searchTerm"
+                       @oninput="OnInputChanged"
+                       Name="searchBox" />
+
+    </div>
+</div>
+  @if (isValidating)
+    {
+        <div class="loader-overlay">
+            <div class="spinner"></div>
+            <div class="loader-text">Validating transactions...</div>
+        </div>
+    }
+  @if (isDeleting)
+    {
+        <div class="loader-overlay">
+            <div class="spinner"></div>
+            <div class="loader-text">Deleting transactions...</div>
+        </div>
+    }
+<ReusableTabController 
+    TabItems="@tabItems" 
+    @bind-ActiveTabIndex="@activeTabIndex"
+    OnTabIndexChanged="@HandleTabChanged"
+    ShowActions="true"
+    ActionButtons="@RenderActionButtons" />
+
+
+<style>
+    .rz-pager-page.rz-state-active {
+        color: #1976d2;
+    }
+
+    .rz-cell-data {
+        text-align: center;
+    }
+
+    .scrollable-grid {
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+    }
+
+    .table-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .rz-datagrid {
+        font-size: 0.95rem;
+    }
+
+    a.rz-pager-first, a.rz-pager-prev, a.rz-pager-next, a.rz-pager-last {
+        display: none !important;
+    }
+
+    .toolbar-actions {
+        margin-bottom: 16px;
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+
+
+    .rz-paginator {
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+    }
+
+    .rz-pager {
+        justify-content: center !important;
+    }
+
+    .row-actions {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        gap: 6px;
+    }
+
+    /* Header font size */
+    .rz-datatable-header th,
+    .rz-grid-table thead th {
+        font-size: 16px !important;
+    }
+
+    /* Row content font size */
+    .rz-grid-table td,
+    .rz-cell-data {
+        font-size: 14px !important;
+    }
+
+    /* Smaller icon buttons for Actions column */
+    .row-actions .rz-button {
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+        min-width: auto !important;
+        height: 32px !important;
+    }
+
+        .row-actions .rz-button .rz-button-icon {
+            font-size: 12px !important;
+        }
+    /* All Radzen DataGrid header titles */
+    .rz-column-title {
+        font-size: 16px !important;
+    }
+
+    .rz-grid-table td, .rz-cell-data {
+        text-align: left;
+    }
+
+    .scrollable-grid {
+        overflow-x: auto; /* Enables horizontal scroll */
+        overflow-y: auto; /* Keeps vertical scroll */
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        max-width: 100%; /* Ensures it doesn't overflow its parent */
+        padding-bottom: 10px; /* Prevents bottom scrollbar from clipping content */
+    }
+
+    .override-section {
+        border-top: 2px solid #f57c00;
+        padding-top: 15px;
+        margin-top: 20px;
+    }
+
+    .validation-message {
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+        font-weight: bold;
+    }
+
+    .validation-message.success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .validation-message.error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .override-result {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 15px;
+        margin-top: 15px;
+    }
+
+    .override-result h5 {
+        margin-top: 0;
+        color: #495057;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 8px;
+    }
+
+    .override-input-section {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+    }
+
+    .override-result-section {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+
+    .section-heading {
+        color: #495057;
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .override-actions {
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    .override-actions .rz-button {
+        min-width: 120px;
+    }
+</style>
+@code {
+     private int activeTabIndex = 0;
+     List<TransactionRecord> hiddenTransactions = new();
+
+private async Task LoadHiddenData()
+{
+    var apiData = await Http.GetFromJsonAsync<List<WorkTransactionDto>>("https://localhost:7045/api/PreEdit/hidden-transactions");
+
+    hiddenTransactions = apiData?.Select(ToTransactionRecord).ToList() ?? new();
+}
+     private List<TransactionRecord> unvalidatedTransactions = new();
+   
+    private List<ReusableTabController.TabItem> tabItems = new();
+
+    protected override void OnInitialized()
+    {
+        tabItems = new List<ReusableTabController.TabItem>
+        {
+            new()
+            {
+                Title = "Edit/Move/Hide",
+                Icon = "edit",
+                Content = @<div>
+<div class="content-page">
+  
+  
+
+
+
+        <RadzenDataGrid TItem="TransactionRecord" Data="@transactions"
+        AllowPaging="true"
+        PageSize="@pageSize"
+
+        AllowSorting="true"
+        ColumnWidth="auto"
+        class="rz-datagrid centered-grid" @ref="grid"
+        PagerHorizontalAlign="Radzen.HorizontalAlign.Center"
+        RowSelect="@OnRowSelect">
+            <Columns>
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="DD_NUM" Title="DD #" Width="100px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="INCOME_SOURCE_TYPE" Title="Income Source" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="PatientName" Title="Name" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="AFFINITY_ACCT_NUM" Title="Account #" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="MRUN" Title="MRUN" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="DECEASED" Title="Deceased" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="Institution" Title="Institution" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="BankDate" Title="FUNB As of " FormatString="{0:yyyy-MM-dd}" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="PFAmount" Title="FUNB Amount" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="CREATED_DATETIME" Title="Created Date" FormatString="{0:yyyy-MM-dd}" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="BankDate" Title="BANK DATE" FormatString="{0:yyyy-MM-dd}" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="MEMO" Title="Memo" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="INCOMPLETE_POSTING_ERR_IND" Title="POSTING ERROR" Width="200px" />          
+            </Columns>
+
+        </RadzenDataGrid>
+        <div class="record-count-info">
+            Total: @transactions.Count record@(transactions.Count == 1 ? "" : "s")
+        </div>
+    </div>
+
+
+@if ( showFilterPanel)
+{
+    <div class="side-overlay" @onclick="() => showFilterPanel = false">
+        <div class="side-panel" @onclick:stopPropagation="true">
+            <h4 style="margin-left:24px; font-weight: 600">Find</h4>
+            <div class="side-panel-body">
+                <RadzenDropDown TValue="string"
+                Data="@filterableFields"
+                @bind-Value="filterSelection.SelectedField"
+                Placeholder="Select Column"
+                Style="width:100%; margin-bottom: 10px;" />
+
+                <RadzenTextBox @bind-Value="filterSelection.FilterValue"
+                Placeholder="Find What"
+                Style="width:100%; margin-bottom: 10px;" />
+
+
+                <div style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start; padding-left: 4px; margin-top: 20px;">
+
+                    <h5 style="margin: 0 0 8px 0; font-weight: 500; color: #444;">Criteria</h5>
+
+                    <div style="display: flex; align-items: center;">
+                        <RadzenCheckBox @bind-Value="filterSelection.MatchCase" Style="margin-right: 8px;" />
+                        <label>Match Case</label>
+                    </div>
+
+                    <div style="display: flex; align-items: center;">
+                        <RadzenCheckBox @bind-Value="filterSelection.ExactMatch" Style="margin-right: 8px;" />
+                        <label>Exact String</label>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="side-panel-footer">
+                <RadzenButton Icon="check" Text="Apply" Style="background-color: #007BFF; color: white;" Click="ApplyMultiFilter" width="112px" />
+                <RadzenButton Icon="refresh" Text="Clear" Style="margin-left: 10px; background-color: #6c757d; color: white;" Click="ResetMultiFilter" width="112px" />
+                <RadzenButton Text="Close" Icon="close"
+                Click="@(() => showFilterPanel = false)"
+                ButtonStyle="ButtonStyle.Danger" Style="margin-left: 8px; width:112px;" />
+
+               
+            </div>
+        </div>
+    </div>
+}
+
+@if (showPanel && selectedTransaction != null)
+{
+    <div class="side-overlay" @onclick="ClosePanel">
+     
+
+        <div class="side-panel" @onclick:stopPropagation="true">
+            @if (!showOverrideSection)
+            {
+                @* Regular Transaction Details View *@
+                <div class="panel-header">
+                    <h3>Transaction Details</h3>
+                    <RadzenIcon Icon="close" Style="cursor:pointer;" @onclick="ClosePanel" />
+                </div>
+                <div class="side-panel-body">
+
+                    <div class="field-row">
+                        <div class="field">
+                            <label>DD #:</label>
+                            <p>@selectedTransaction.DD_NUM</p>
+                        </div>
+
+                        <div class="field"><label>MRUN:</label> <p>@selectedTransaction.MRUN</p></div>
+
+                    </div>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>Memo:</label>
+                            @if (isEditMode)
+                            {
+                                <RadzenTextBox @bind-Value="selectedTransaction.MEMO" Style="width:100%;" class="edit-fields" />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.MEMO</p>
+                            }
+                        </div>
+
+                        <div class="field">
+                            <label>Income Source:</label>
+                            @if (isEditMode)
+                            {
+                                //<RadzenTextBox @bind-Value="selectedTransaction.INCOME_SOURCE_TYPE" Style="width:100%;" class="edit-fields" />
+                              <RadzenDropDown 
+                            Data="@incomeSourceTypes"
+                            @bind-Value="selectedTransaction.INCOME_SOURCE_TYPE"
+                            Placeholder="Select Income Source Type"
+                            Style="width: 100%;"
+                            AllowClear="false"
+                        />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.INCOME_SOURCE_TYPE</p>
+                            }
+                        </div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>Name:</label>
+                            @if (isEditMode)
+                            {
+                                <RadzenTextBox @bind-Value="selectedTransaction.PatientName" Style="width:100%;" class="edit-fields" />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.PatientName</p>
+                            }
+                        </div>
+
+                        <div class="field">
+                            <label>Account #:</label>
+                            @if (isEditMode)
+                            {
+                                <RadzenTextBox @bind-Value="selectedTransaction.AFFINITY_ACCT_NUM" Style="width:100%;" class="edit-fields" />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.AFFINITY_ACCT_NUM</p>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="field-row">
+                        <div class="field">
+                            <label>Deceased:</label>
+                            @if (isEditMode)
+                            {
+                                <RadzenTextBox @bind-Value="selectedTransaction.DECEASED" Style="width:100%;" class="edit-fields" />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.DECEASED</p>
+                            }
+                        </div>
+
+                        <div class="field">
+                            <label>Institution:</label>
+                            @if (isEditMode)
+                            {
+                                <RadzenTextBox @bind-Value="selectedTransaction.Institution" Style="width:100%;" class="edit-fields" />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.Institution</p>
+                            }
+                        </div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>FUNB Amount:</label>
+                            @if (isEditMode)
+                            {
+                                <RadzenNumeric TValue="decimal" @bind-Value="selectedTransaction.PFAmount" Style="width:100%;" class="edit-fields" />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.PFAmount</p>
+                            }
+                        </div>
+                        <div class="field"><label>FUNB As of:</label> <p>@selectedTransaction.BankDate?.ToString("yyyy-MM-dd")</p></div>
+
+                    </div>
+                    <div class="field-row">
+                        <div class="field"><label>Created Date:</label> <p>@selectedTransaction.CREATED_DATETIME?.ToString("yyyy-MM-dd")</p></div>
+
+                        <div class="field"><label>Bank Date:</label> <p>@selectedTransaction.BankDate?.ToString("yyyy-MM-dd")</p></div>
+                    </div>
+                    <div class="field">
+                        <label>Posting Error:</label>
+                        <div class="console-box">
+                            @selectedTransaction.INCOMPLETE_POSTING_ERR_IND
+                        </div> 
+                    </div>
+                </div>
+
+                <div class="side-panel-footer">
+                    @if (isEditMode)
+                    {
+                        <RadzenButton Text="Save" Icon="save" ButtonType="Radzen.ButtonType.Submit" Click="@OnSubmit"
+                        ButtonStyle="ButtonStyle.Secondary" Style="margin-right: 8px; width:112px;" />
+                        <RadzenButton Text="Cancel" Icon="close" Style="background-color: #e57373; color: white;width:112px;" Click="CancelEdit" />
+                    }
+                    else
+                    {
+
+
+                      <div class="button-group">
+                       <RadzenButton Text="Edit" 
+                       Style="background-color: #007BFF; color: white;width:112px;"
+                       Icon="edit" Click="@(() => isEditMode = true)" />
+
+                     <RadzenButton Text="Override"
+                      Icon="autorenew"
+                      Style="background-color: #7e8387; color: white; width:112px;"
+                      Click="@(() => showOverrideSection = true)" width="112px"/>
+
+                     <RadzenButton Icon="delete" Text="Delete"
+                        Style="background-color: #e53935; color: white; width:112px;"
+                        Click="@(() => OnDelete(selectedTransaction))"  Width="100px"/>               
+
+                      </div>
+                      <div class="button-group">
+                      <RadzenButton Icon="visibility_off"   Style="background-color: #7e8387; color: white; width:112px;" 
+                       
+                      Click="@(args => ShowOrHideSelectedTransaction(Convert.ToInt64(selectedTransaction.INVALID_RECORD_ID), "I"))"
+                      Text="Hide"  Width="100px" />
+
+                    <RadzenButton Icon="build"   Style="background-color: #7e8387; color: white; width:112px;white-space: nowrap;overflow: hidden; text-align: center;padding-left:5px;" 
+                       
+                      Text="Auto Resolve" Disabled="true" ></RadzenButton>
+
+                    <RadzenButton Icon="close"   Style="background-color: #7e8387; color: white; width:112px;" 
+                       
+                      Click="ClosePanel"
+                      Text="Close" Width="100px"/>
+                      </div>
+                    
+                      }
+                </div>
+            }
+            else
+            {
+                @* Override Section - Force Direct Deposit *@
+                <div class="panel-header">
+                    <h3>Force Direct Deposit</h3>
+                    <RadzenIcon Icon="close" Style="cursor:pointer;" @onclick="ClosePanel" />
+                </div>
+                
+                <div class="side-panel-body">
+                    @* First Section: Input Fields *@
+                    <div class="override-input-section">
+                        <p>Enter the account number and amounts you want to override</p>
+                        
+                    
+                            <div class="field mb-20">
+                                <label class="mb-1">Account Number:</label>
+                                <RadzenTextBox @bind-Value="overrideRequest.AccountNumber" 
+                                             Style="width:100%;" 
+                                             MaxLength="8"
+                                             Placeholder="Enter 8-digit account number" 
+                                              @onblur="ValidateAccountNumber"
+                                             />
+                                @if (!string.IsNullOrEmpty(errorMessage))
+                                {
+                                    <div style="color: red; font-size: 0.9em;">@errorMessage</div>
+                                }
+                            </div>
+                            <div class="field mb-20">
+                                <label class="mb-1">Account Amount:</label>
+                                <RadzenNumeric TValue="decimal" 
+                                             @bind-Value="overrideRequest.AccountAmount" 
+                                             Style="width:100%;" 
+                                             Min="1" 
+                                               @onblur="ValidateAccountAmount"/>
+                                             @if (!string.IsNullOrEmpty(accountAmountError))
+                                                {
+                                                    <div style="color: red; font-size: 0.9em;">@accountAmountError</div>
+                                                }
+                            </div>
+                            <div class="field mb-20">
+                                <label class="mb-1">Personal Funds Amount:</label>
+                                <RadzenNumeric TValue="decimal" 
+                                             @bind-Value="overrideRequest.PersonalFundsAmount" 
+                                             Style="width:100%;" 
+                                             Min="1" 
+                                                 @onblur="ValidatePersonalFundsAmount"
+                                             />
+                                               @if (!string.IsNullOrEmpty(personalFundsError))
+                                                {
+                                                    <div style="color: red; font-size: 0.9em;">@personalFundsError</div>
+                                                }
+                            </div>
+
+                            <div class="field mb-20">
+                                <label class="mb-1">ATP/PML:</label>
+                                <RadzenDropDown TValue="string"
+                                             Data="@atpPmlOptions"
+                                             @bind-Value="overrideRequest.AtpPml"
+                                             Style="width:100%;"
+                                             Placeholder="Select A or P" />
+                            </div>
+
+
+                        @if (!string.IsNullOrEmpty(overrideValidationMessage))
+                        {
+                            <div class="validation-message @(overrideValidationSuccess ? "success" : "error")">
+                                @overrideValidationMessage
+                            </div>
+                        }
+
+                     
+                    </div>
+
+                    @* Second Section: Resulting Records (shown after validation) *@
+                    @if (overrideRecord != null)
+                    {
+                        <div class="override-result-section">
+                            <h4 class="section-heading">Resulting Record</h4>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>DD Number:</label>
+                                    <p>@overrideRecord.DdNumber</p>
+                                </div>
+                                <div class="field">
+                                    <label>Income Source:</label>
+                                    <p>@overrideRecord.IncomeSource</p>
+                                </div>
+                            </div>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>Patient Name:</label>
+                                    <p>@overrideRecord.PatientName</p>
+                                </div>
+                                <div class="field">
+                                    <label>Institution Code:</label>
+                                    <p>@overrideRecord.InstitutionCode</p>
+                                </div>
+                            </div>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>Affinity Account:</label>
+                                    <p>@overrideRecord.AffinityAccountNumber</p>
+                                </div>
+                                <div class="field">
+                                    <label>Medical Record #:</label>
+                                    <p>@overrideRecord.MedicalRecordNumber</p>
+                                </div>
+                            </div>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>Debit/Credit Flag:</label>
+                                    <p>@overrideRecord.DebitCreditFlag</p>
+                                </div>
+                                <div class="field">
+                                    <label>ATP/PML Flag:</label>
+                                    <p>@overrideRecord.AtpPmlFlag</p>
+                                </div>
+                            </div>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>FUNB As Of Date:</label>
+                                    <p>@overrideRecord.FunbAsOfDate?.ToString("yyyy-MM-dd")</p>
+                                </div>
+                                <div class="field">
+                                    <label>Created Date:</label>
+                                    <p>@overrideRecord.CreatedDate?.ToString("yyyy-MM-dd")</p>
+                                </div>
+                            </div>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>Deceased Indicator:</label>
+                                    <p>@overrideRecord.DeceasedIndicator</p>
+                                </div>
+                                <div class="field">
+                                    <label>FUNB Amount:</label>
+                                    <p>@overrideRecord.FunbAmount.ToString("C")</p>
+                                </div>
+                            </div>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>Account Amount:</label>
+                                    <p>@overrideRecord.AccountAmount.ToString("C")</p>
+                                </div>
+                                <div class="field">
+                                    <label>Personal Funds Amount:</label>
+                                    <p>@overrideRecord.PersonalFundsAmount.ToString("C")</p>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="side-panel-footer">
+                    @if (overrideRecord != null)
+                    {
+                        <RadzenButton Text="Force Deposit"
+                                      Icon="send"
+                                      Style="background-color: #f57c00; color: white;width:112px;"
+                                      Click="@ForceDepositAsync" />
+                    }
+                   else
+                   {
+                 <RadzenButton Text="Validate"
+                                          Icon="check_circle"
+                                          Style="background-color: #007BFF; color: white;width:112px;"
+                                          Click="@ValidateOverrideAsync"
+                                          Disabled="@(!IsOverrideFormValid)" />
+                    }
+                            
+                    
+                    <RadzenButton Text="Cancel"
+                                  Icon="close"
+                                  Style="background-color: #6c757d; color: white; margin-left: 10px;width:112px;"
+                                  Click="@(() => { showOverrideSection = false; ResetOverrideForm(); })" />
+                </div>
+            }
+        </div>
+    </div>
+}
+
+
+
+<RadzenNotification />
+</div>
+
+            },
+         new()
+            {
+                Title = "Unhide",
+                Icon = "delete",
+                Content = @<div>@RenderTransactionGrid(hiddenTransactions, showActions: false)
+                
+                @if (showPanel && selectedTransaction != null)
+{
+    <div class="side-overlay" @onclick="ClosePanel">
+     
+
+        <div class="side-panel" @onclick:stopPropagation="true">
+            @if (!showOverrideSection)
+            {
+                @* Regular Transaction Details View *@
+                <div class="panel-header">
+                    <h3>Transaction Details</h3>
+                    <RadzenIcon Icon="close" Style="cursor:pointer;" @onclick="ClosePanel" />
+                </div>
+                <div class="side-panel-body">
+
+                    <div class="field-row">
+                        <div class="field">
+                            <label>DD #:</label>
+                            <p>@selectedTransaction.DD_NUM</p>
+                        </div>
+
+                        <div class="field"><label>MRUN:</label> <p>@selectedTransaction.MRUN</p></div>
+
+                    </div>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>Memo:</label>
+                            @if (isEditMode)
+                            {
+                                <RadzenTextBox @bind-Value="selectedTransaction.MEMO" Style="width:100%;" class="edit-fields" />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.MEMO</p>
+                            }
+                        </div>
+
+                        <div class="field">
+                            <label>Income Source:</label>
+                            @if (isEditMode)
+                            {
+                              <RadzenDropDown 
+                            Data="@incomeSourceTypes"
+                            @bind-Value="selectedTransaction.INCOME_SOURCE_TYPE"
+                            Placeholder="Select Income Source Type"
+                            Style="width: 100%;"
+                            AllowClear="false"
+                        />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.INCOME_SOURCE_TYPE</p>
+                            }
+                        </div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>Name:</label>
+                            @if (isEditMode)
+                            {
+                                <RadzenTextBox @bind-Value="selectedTransaction.PatientName" Style="width:100%;" class="edit-fields" />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.PatientName</p>
+                            }
+                        </div>
+
+                        <div class="field">
+                            <label>Account #:</label>
+                            @if (isEditMode)
+                            {
+                                <RadzenTextBox @bind-Value="selectedTransaction.AFFINITY_ACCT_NUM" Style="width:100%;" class="edit-fields" />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.AFFINITY_ACCT_NUM</p>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="field-row">
+                        <div class="field">
+                            <label>Deceased:</label>
+                            @if (isEditMode)
+                            {
+                                <RadzenTextBox @bind-Value="selectedTransaction.DECEASED" Style="width:100%;" class="edit-fields" />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.DECEASED</p>
+                            }
+                        </div>
+
+                        <div class="field">
+                            <label>Institution:</label>
+                            @if (isEditMode)
+                            {
+                                <RadzenTextBox @bind-Value="selectedTransaction.Institution" Style="width:100%;" class="edit-fields" />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.Institution</p>
+                            }
+                        </div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field">
+                            <label>FUNB Amount:</label>
+                            @if (isEditMode)
+                            {
+                                <RadzenNumeric TValue="decimal" @bind-Value="selectedTransaction.PFAmount" Style="width:100%;" class="edit-fields" />
+                            }
+                            else
+                            {
+                                <p>@selectedTransaction.PFAmount</p>
+                            }
+                        </div>
+                        <div class="field"><label>FUNB As of:</label> <p>@selectedTransaction.BankDate?.ToString("yyyy-MM-dd")</p></div>
+
+                    </div>
+                    <div class="field-row">
+                        <div class="field"><label>Created Date:</label> <p>@selectedTransaction.CREATED_DATETIME?.ToString("yyyy-MM-dd")</p></div>
+
+                        <div class="field"><label>Bank Date:</label> <p>@selectedTransaction.BankDate?.ToString("yyyy-MM-dd")</p></div>
+                    </div>
+                    <div class="field">
+                        <label>Posting Error:</label>
+                        <div class="console-box">
+                            @selectedTransaction.INCOMPLETE_POSTING_ERR_IND
+                        </div> 
+                    </div>
+                </div>
+
+                <div class="side-panel-footer">
+                    @if (isEditMode)
+                    {
+                        <RadzenButton Text="Save" Icon="save" ButtonType="Radzen.ButtonType.Submit" Click="@OnSubmit"
+                        ButtonStyle="ButtonStyle.Secondary" Style="margin-right: 8px;width:112px;" />
+                        <RadzenButton Text="Cancel" Icon="close" Style="background-color: #e57373; color: white;width:112px;" Click="CancelEdit" />
+                    }
+                    else
+                    {
+
+                      <div class="button-group">
+                     
+                    <RadzenButton Icon="visibility"   Style="background-color: #007BFF; color: white;width:112px;" 
+                       
+                      Text="UnHide" Click="@(args => ShowOrHideSelectedTransaction(Convert.ToInt64(selectedTransaction.INVALID_RECORD_ID), "A"))" />
+
+                    <RadzenButton Icon="close"   Style="background-color:#e57373; color: white;width:112px;" 
+                       
+                      Click="ClosePanel"
+                      Text="Close" />
+                      </div>
+                    
+                                            }
+                </div>
+            }
+            else
+            {
+                @* Override Section - Force Direct Deposit *@
+                <div class="panel-header">
+                    <h3>Force Direct Deposit</h3>
+                    <RadzenIcon Icon="close" Style="cursor:pointer;" @onclick="ClosePanel" />
+                </div>
+                
+                <div class="side-panel-body">
+                    @* First Section: Input Fields *@
+                    <div class="override-input-section">
+                        <p>Enter the account number and amounts you want to override</p>
+                        
+                    
+                            <div class="field mb-20">
+                                <label class="mb-1">Account Number:</label>
+                                <RadzenTextBox @bind-Value="overrideRequest.AccountNumber" 
+                                             Style="width:100%;" 
+                                             MaxLength="8"
+                                             Placeholder="Enter 8-digit account number" 
+                                              @onblur="ValidateAccountNumber"
+                                             />
+                                @if (!string.IsNullOrEmpty(errorMessage))
+                                {
+                                    <div style="color: red; font-size: 0.9em;">@errorMessage</div>
+                                }
+                            </div>
+                            <div class="field mb-20">
+                                <label class="mb-1">Account Amount:</label>
+                                <RadzenNumeric TValue="decimal" 
+                                             @bind-Value="overrideRequest.AccountAmount" 
+                                             Style="width:100%;" 
+                                             Min="1" 
+                                               @onblur="ValidateAccountAmount"/>
+                                             @if (!string.IsNullOrEmpty(accountAmountError))
+                                                {
+                                                    <div style="color: red; font-size: 0.9em;">@accountAmountError</div>
+                                                }
+                            </div>
+                            <div class="field mb-20">
+                                <label class="mb-1">Personal Funds Amount:</label>
+                                <RadzenNumeric TValue="decimal" 
+                                             @bind-Value="overrideRequest.PersonalFundsAmount" 
+                                             Style="width:100%;" 
+                                             Min="1" 
+                                                 @onblur="ValidatePersonalFundsAmount"
+                                             />
+                                               @if (!string.IsNullOrEmpty(personalFundsError))
+                                                {
+                                                    <div style="color: red; font-size: 0.9em;">@personalFundsError</div>
+                                                }
+                            </div>
+
+                            <div class="field mb-20">
+                                <label class="mb-1">ATP/PML:</label>
+                                <RadzenDropDown TValue="string"
+                                             Data="@atpPmlOptions"
+                                             @bind-Value="overrideRequest.AtpPml"
+                                             Style="width:100%;"
+                                             Placeholder="Select A or P" />
+                            </div>
+
+                       
+
+                        @if (!string.IsNullOrEmpty(overrideValidationMessage))
+                        {
+                            <div class="validation-message @(overrideValidationSuccess ? "success" : "error")">
+                                @overrideValidationMessage
+                            </div>
+                        }
+
+                     
+                    </div>
+
+                    @* Second Section: Resulting Records (shown after validation) *@
+                    @if (overrideRecord != null)
+                    {
+                        <div class="override-result-section">
+                            <h4 class="section-heading">Resulting Record</h4>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>DD Number:</label>
+                                    <p>@overrideRecord.DdNumber</p>
+                                </div>
+                                <div class="field">
+                                    <label>Income Source:</label>
+                                    <p>@overrideRecord.IncomeSource</p>
+                                </div>
+                            </div>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>Patient Name:</label>
+                                    <p>@overrideRecord.PatientName</p>
+                                </div>
+                                <div class="field">
+                                    <label>Institution Code:</label>
+                                    <p>@overrideRecord.InstitutionCode</p>
+                                </div>
+                            </div>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>Affinity Account:</label>
+                                    <p>@overrideRecord.AffinityAccountNumber</p>
+                                </div>
+                                <div class="field">
+                                    <label>Medical Record #:</label>
+                                    <p>@overrideRecord.MedicalRecordNumber</p>
+                                </div>
+                            </div>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>Debit/Credit Flag:</label>
+                                    <p>@overrideRecord.DebitCreditFlag</p>
+                                </div>
+                                <div class="field">
+                                    <label>ATP/PML Flag:</label>
+                                    <p>@overrideRecord.AtpPmlFlag</p>
+                                </div>
+                            </div>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>FUNB As Of Date:</label>
+                                    <p>@overrideRecord.FunbAsOfDate?.ToString("yyyy-MM-dd")</p>
+                                </div>
+                                <div class="field">
+                                    <label>Created Date:</label>
+                                    <p>@overrideRecord.CreatedDate?.ToString("yyyy-MM-dd")</p>
+                                </div>
+                            </div>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>Deceased Indicator:</label>
+                                    <p>@overrideRecord.DeceasedIndicator</p>
+                                </div>
+                                <div class="field">
+                                    <label>FUNB Amount:</label>
+                                    <p>@overrideRecord.FunbAmount.ToString("C")</p>
+                                </div>
+                            </div>
+                            
+                            <div class="field-row">
+                                <div class="field">
+                                    <label>Account Amount:</label>
+                                    <p>@overrideRecord.AccountAmount.ToString("C")</p>
+                                </div>
+                                <div class="field">
+                                    <label>Personal Funds Amount:</label>
+                                    <p>@overrideRecord.PersonalFundsAmount.ToString("C")</p>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="side-panel-footer">
+                    @if (overrideRecord != null)
+                    {
+                        <RadzenButton Text="Force Deposit"
+                                      Icon="send"
+                                      Style="background-color: #f57c00; color: white;width:112px;"
+                                      Click="@ForceDepositAsync" />
+                    }
+                   else
+                   {
+                 <RadzenButton Text="Validate"
+                                          Icon="check_circle"
+                                          Style="background-color: #007BFF; color: white;width:112px;"
+                                          Click="@ValidateOverrideAsync"
+                                          Disabled="@(!IsOverrideFormValid)" />
+                    }
+                            
+                    
+                    <RadzenButton Text="Cancel"
+                                  Icon="close"
+                                  Style="background-color: #6c757d; color: white; margin-left: 10px;width:112px;"
+                                  Click="@(() => { showOverrideSection = false; ResetOverrideForm(); })" />
+                </div>
+            }
+        </div>
+    </div>
+}
+
+                </div>
+            },
+            new()
+            {
+                Title = "Unvalidated",
+                Icon="warning",
+                Content = @<div> @RenderTransactionGrid(unvalidatedTransactions, showActions: true) </div>
+            }
+        };
+    
+
+    }
+
+    private async Task HandleTabChanged(int index)
+    {
+        // Handle tab change logic here
+        await Task.CompletedTask;
+
+          var unvalidatedApi = await Http.GetFromJsonAsync<List<WorkTransactionDto>>($"https://localhost:7045/api/transactions/unvalidated");
+
+     unvalidatedTransactions = unvalidatedApi?.Select(ToTransactionRecord).ToList() ?? new();
+    }
+    
+    private TransactionRecord ToTransactionRecord(WorkTransactionDto x) => new()
+    {
+            DD_NUM = x.DD_NUM,
+            INCOME_SOURCE_TYPE = string.IsNullOrWhiteSpace(x.FUNB_INCOME_SRC_TYPE) ? "" : x.FUNB_INCOME_SRC_TYPE,
+            AFFINITY_ACCT_NUM = string.IsNullOrWhiteSpace(x.AFFINITY_ACCT_NUM) ? "" : x.AFFINITY_ACCT_NUM,
+            BankDate = x.AS_OF_DATETIME ?? DateTime.MinValue,
+            Institution = string.IsNullOrWhiteSpace(x.INSTITUTION_CODE) ? "" : x.INSTITUTION_CODE,
+            MRUN = string.IsNullOrWhiteSpace(x.MEDICAL_RECORD_NUM) ? "" : x.MEDICAL_RECORD_NUM,
+            CREATED_DATETIME = x.CREATED_DATETIME,
+            BAI_FILE_ID = x.BAI_FILE_ID,
+            INVALID_RECORD_ID = x.INVALID_RECORD_ID,
+            INVALID_REC_ERR_MSG = x.INVALID_REC_ERR_MSG,
+            PatientName = string.IsNullOrWhiteSpace(x.PATIENT_NAME) ? "" : x.PATIENT_NAME,
+            DECEASED = string.IsNullOrWhiteSpace(x.DECEASED_IND) ? "" : x.DECEASED_IND,
+            PFAmount = x.PFAmount == null ? 0 : x.PFAmount,
+            MEMO = string.IsNullOrWhiteSpace(x.MEMO) ? "" : x.MEMO,
+            INCOMPLETE_POSTING_ERR_IND = string.IsNullOrWhiteSpace(x.INCOMPLETE_POSTING_ERR_IND) ? "N/A" : x.INCOMPLETE_POSTING_ERR_IND,
+            INSTITUTION_CODE_3 = string.IsNullOrWhiteSpace(x.INSTITUTION_CODE_3) ? "" : x.INSTITUTION_CODE_3  
+
+    };
+
+  @inject NavigationManager NavigationManager
+
+private RenderFragment<int> RenderActionButtons => (tabIndex) => @<text>
+    @if (tabIndex == 0)
+    {
+        <div class="toolbar-actions">
+            <RadzenButton Click="ValidateUnvalidatedTransactions" 
+                          Style="width: 112px; background-color: #007BFF;" 
+                          Text="Validate" 
+                          Disabled="!hasUnvalidatedTransactions" />
+            <RadzenButton Style="width: 112px; background-color: #7e8387; color: white;"
+                          Text="Find"
+                          Click="@(() => showFilterPanel = true)" />
+        </div>
+    }
+    else if (tabIndex == 2)
+    {
+        <div class="toolbar-actions">
+            <RadzenButton Click="ValidateUnvalidatedTransactions" 
+                          Style="width: 112px; background-color: #007BFF;" 
+                          Text="Validate" 
+                          Disabled="!hasUnvalidatedTransactions" />
+            <RadzenButton Variant="Variant.Outlined"   ButtonStyle="ButtonStyle.Danger"
+                          Text="Close" Style="width: 112px;"
+                          Click="@(() => NavigationManager.NavigateTo("/"))" />
+        </div>
+    }
+</text>;
+
+
+    [Parameter] public int pageSize { get; set; } = 12;
+    private bool isDeleting = false;
+    private List<string> incomeSourceTypes = new();
+    private RadzenDataGrid<TransactionRecord>? grid;
+    private List<int> pageSizeOptions = new() { 25, 50, 100 };
+    private List<TransactionRecord> transactions = new();
+    private string selectedType = "Invalid Transactions";
+    private bool isEditMode = false;
+    private bool isValidating = false;
+
+    private bool showPanel = false;
+    private TransactionRecord? selectedTransaction = null;
+
+    private string errorMessage = "";
+    private string accountNumber = "";
+    private string accountAmountError = "";
+    private string personalFundsError = "";
+
+
+     private void ValidateAccountNumber()
+    {
+
+        var input = overrideRequest.AccountNumber ?? "";
+
+        if (input.Length != 8 || !input.All(char.IsDigit))
+        {
+            errorMessage = "Account number must be exactly 8 digits.";
+        }
+        else
+        {
+            errorMessage = "";
+        }
+
+        StateHasChanged(); // ensure UI updates
+    }
+       private void ValidateAccountAmount()
+    {
+        if (overrideRequest.AccountAmount < 1)
+        {
+            accountAmountError = "Account amount must be greater than 0.";
+        }
+        else
+        {
+            accountAmountError = "";
+        }
+
+        StateHasChanged();
+    }
+
+    private void ValidatePersonalFundsAmount()
+    {
+        if (overrideRequest.PersonalFundsAmount < 1)
+        {
+            personalFundsError = "Personal funds amount must be greater than 0.";
+        }
+        else
+        {
+            personalFundsError = "";
+        }
+
+        StateHasChanged();
+    }
+
+
+    // Override related properties
+    private bool showOverrideSection = false;
+    private OverrideRequest overrideRequest = new();
+    private OverrideRecord? overrideRecord = null;
+    private string overrideValidationMessage = string.Empty;
+    private bool overrideValidationSuccess = false;
+    private List<string> atpPmlOptions = new() { "A", "P" };
+
+    private string searchTerm = string.Empty;
+    private List<TransactionRecord> allTransactions = new(); 
+
+    private bool hasUnvalidatedTransactions = false;
+
+    private void OnInputChanged(ChangeEventArgs e)
+    {
+        OnSearchChanged(e.Value);
+    }
+
+
+    private class SingleColumnFilter
+    {
+        public string? SelectedField { get; set; }
+        public string? FilterValue { get; set; }
+        public bool MatchCase { get; set; }
+        public bool ExactMatch { get; set; }
+    }
+
+    private SingleColumnFilter filterSelection = new();
+    private List<string> filterableFields = new()
+    {
+    nameof(TransactionRecord.DD_NUM),
+    nameof(TransactionRecord.MEMO),
+    nameof(TransactionRecord.INCOME_SOURCE_TYPE),
+    nameof(TransactionRecord.PatientName),
+    nameof(TransactionRecord.AFFINITY_ACCT_NUM),
+    nameof(TransactionRecord.MRUN),
+    nameof(TransactionRecord.Institution)
+    };
+
+    // Override validation properties
+    private bool IsOverrideFormValid => 
+        !string.IsNullOrWhiteSpace(overrideRequest.AccountNumber) &&
+        overrideRequest.AccountNumber.Length == 8 &&
+        overrideRequest.AccountAmount > 0 &&
+        overrideRequest.PersonalFundsAmount >= 0 &&
+        !string.IsNullOrWhiteSpace(overrideRequest.AtpPml) &&
+        (overrideRequest.AtpPml == "A" || overrideRequest.AtpPml == "P");
+
+    private bool IsTotalValid => 
+        selectedTransaction != null && 
+        Math.Abs((overrideRequest.AccountAmount + overrideRequest.PersonalFundsAmount) - selectedTransaction.PFAmount) < 0.01m;
+
+    private void OnRowSelect(TransactionRecord record)
+    {
+        selectedTransaction = record;
+        showPanel = true;
+        showOverrideSection = false;
+        ResetOverrideForm();
+    }
+    
+    private void SaveChanges()
+    {
+        isEditMode = false;
+    }
+
+    private void CancelEdit()
+    {
+        isEditMode = false;
+    }
+
+    private void ClosePanel()
+    {
+        showPanel = false;
+        isEditMode = false;
+        showOverrideSection = false;
+        ResetOverrideForm();
+    }
+
+    private void ResetOverrideForm()
+    {
+        overrideRequest = new OverrideRequest();
+        overrideRecord = null;
+        overrideValidationMessage = string.Empty;
+        overrideValidationSuccess = false;
+    }
+
+    private async Task ValidateOverrideAsync()
+    {
+        if (selectedTransaction == null || selectedTransaction.INVALID_RECORD_ID == null)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = "No transaction selected.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        try
+        {
+
+            var request = new OverrideRequest
+                    {
+                        AccountNumber = selectedTransaction.AFFINITY_ACCT_NUM,
+                        AccountAmount = selectedTransaction.PAAmount,
+                        PersonalFundsAmount = selectedTransaction.PFAmount,
+                        AtpPml = "A"
+                    };
+            var response = await Http.PostAsJsonAsync($"https://localhost:7045/api/Override/validate/{selectedTransaction.INVALID_RECORD_ID}", request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<OverrideResponse>();
+                if (result?.Success == true)
+                {
+                    overrideRecord = result.Record;
+                    overrideValidationMessage = result.Message;
+                    overrideValidationSuccess = true;
+                    
+                    NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Validation Successful",
+                        Detail = result.Message,
+                        Duration = 4000
+                    });
+                }
+                else
+                {
+                    overrideValidationMessage = result?.Message ?? "Validation failed";
+                    overrideValidationSuccess = false;
+                    overrideRecord = null;
+                    
+                    NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Validation Failed",
+                        Detail = result?.Message ?? "Validation failed",
+                        Duration = 4000
+                    });
+                }
+            }
+            else
+            {
+                overrideValidationMessage = "Server error during validation";
+                overrideValidationSuccess = false;
+                overrideRecord = null;
+                
+              
+            }
+        }
+        catch (Exception ex)
+        {
+            overrideValidationMessage = $"Error: {ex.Message}";
+            overrideValidationSuccess = false;
+            overrideRecord = null;
+            
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"An error occurred: {ex.Message}",
+                Duration = 4000
+            });
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task ForceDepositAsync()
+    {
+        if (selectedTransaction == null || selectedTransaction.INVALID_RECORD_ID == null || overrideRecord == null)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = "No transaction selected or validation not completed.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"https://localhost:7045/api/override/move/{selectedTransaction.INVALID_RECORD_ID}", overrideRequest);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Override Successful",
+                    Detail = $"DD #{selectedTransaction.DD_NUM} moved to valid successfully.",
+                    Duration = 4000
+                });
+                
+                showPanel = false;
+                showOverrideSection = false;
+                ResetOverrideForm();
+                await LoadTransactionsAsync();
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Override Failed",
+                    Detail = "Server was unable to move the record.",
+                    Duration = 4000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"An error occurred: {ex.Message}",
+                Duration = 4000
+            });
+        }
+    }
+
+    private async Task OnSubmit()
+    {
+        if (selectedTransaction is null || selectedTransaction.INVALID_RECORD_ID == null)
+        {
+            NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Validation Error",
+                        Detail = "No transaction is selected or the record is incomplete.",
+                        Duration = 4000
+                    });
+            return;
+        }
+
+        var dto = new InvalidRecordDto
+                {
+                    INVALID_RECORD_ID = selectedTransaction.INVALID_RECORD_ID.Value,
+                    AFFINITY_ACCT_NUM = selectedTransaction.AFFINITY_ACCT_NUM,
+                    DD_NUM = selectedTransaction.DD_NUM,
+                    MEDICAL_RECORD_NUM = selectedTransaction.MRUN,
+                    FUNB_INCOME_SRC_TYPE = selectedTransaction.INCOME_SOURCE_TYPE,
+                    AS_OF_DATETIME = selectedTransaction.BankDate,
+                    CREATED_DATETIME = selectedTransaction.CREATED_DATETIME ?? DateTime.Now
+                };
+
+        bool success = await PreEditService.SavePreEditAsync(dto);
+
+        if (success)
+        {
+            NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Saved",
+                        Detail = $"DD #{selectedTransaction.DD_NUM} has been updated.",
+                        Duration = 4000
+                    });
+
+            isEditMode = false;
+            showPanel = false;
+            hasUnvalidatedTransactions = true;
+
+            await LoadTransactionsAsync(); // Refresh the grid
+        }
+        else
+        {
+            NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Save Failed",
+                        Detail = "Server was unable to save the changes.",
+                        Duration = 4000
+                    });
+        }
+    }
+
+
+    void ShowFullError(string errorMsg)
+    {
+        DialogService.Open("Error Details", ds =>
+    @<div style="padding: 1rem; max-width: 600px;">
+        <p>@errorMsg</p>
+    </div>
+    ,
+        new DialogOptions { Width = "600px", Resizable = true });
+    }
+
+    string Truncate(string value, int length)
+    {
+        if (string.IsNullOrEmpty(value)) return value;
+        return value.Length <= length ? value : value.Substring(0, length) + "...";
+    }
+    private async Task ShowOrHideSelectedTransaction(long recordId, string status)
+ {
+           var hideRequest = new HidePreEditRequestDto
+        {
+            InvalidRecordId = recordId,
+            RecordStatus = status,
+            UserId = "admin"
+        };
+
+
+     var response = await Http.PostAsJsonAsync("https://localhost:7045/api/preedit/hide-preedit", hideRequest);
+
+     if (response.IsSuccessStatusCode)
+     {
+         NotificationService.Notify(new NotificationMessage
+     {
+         Severity = NotificationSeverity.Success,
+         Summary = "Success",
+         Detail = "Record hidden successfully"
+     });
+
+         LoadPreEditData(); //refresh list
+         // await LoadHiddenData();  refresh hidden tab list
+         showFilterPanel = false;
+
+     }
+     else
+     {
+         NotificationService.Notify(new NotificationMessage
+     {
+         Severity = NotificationSeverity.Error,
+         Summary = "Error",
+         Detail = "Failed to hide record"
+     });
+     }
+
+
+ }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTransactionsAsync();
+        await LoadHiddenData();
+        hasUnvalidatedTransactions = await FileloadService.CheckIfWorkFileExistsAsync();
+         incomeSourceTypes = await LookupService.GetIncomeSourceTypesAsync();
+    }
+    private async Task LoadTransactionsAsync()
+    {
+        try
+        {
+            var apiResponse = await Http.GetFromJsonAsync<List<WorkTransactionDto>>("https://localhost:7045/api/preedit");
+
+            allTransactions = apiResponse?.Select(x => new TransactionRecord
+                {
+                // map your properties as you're already doing
+                    DD_NUM = x.DD_NUM,
+                    INCOME_SOURCE_TYPE = string.IsNullOrWhiteSpace(x.FUNB_INCOME_SRC_TYPE) ? "" : x.FUNB_INCOME_SRC_TYPE,
+                    MRUN = string.IsNullOrWhiteSpace(x.MEDICAL_RECORD_NUM) ? "" : x.MEDICAL_RECORD_NUM,
+                    AFFINITY_ACCT_NUM = string.IsNullOrWhiteSpace(x.AFFINITY_ACCT_NUM) ? "" : x.AFFINITY_ACCT_NUM,
+                    BankDate = x.AS_OF_DATETIME ?? DateTime.MinValue,
+                    Institution = string.IsNullOrWhiteSpace(x.INSTITUTION_CODE) ? "" : x.INSTITUTION_CODE,
+                    CREATED_DATETIME = x.CREATED_DATETIME,
+                    BAI_FILE_ID = x.BAI_FILE_ID,
+                    INVALID_RECORD_ID = x.INVALID_RECORD_ID,
+                    INVALID_REC_ERR_MSG = x.INVALID_REC_ERR_MSG,
+                    PatientName = string.IsNullOrWhiteSpace(x.PATIENT_NAME) ? "" : x.PATIENT_NAME,
+                    DECEASED = string.IsNullOrWhiteSpace(x.DECEASED_IND) ? "" : x.DECEASED_IND,
+                    PFAmount = x.PFAmount == null ? 0 : x.PFAmount,
+                    MEMO = string.IsNullOrWhiteSpace(x.MEMO) ? "" : x.MEMO,
+                    INCOMPLETE_POSTING_ERR_IND = string.IsNullOrWhiteSpace(x.INCOMPLETE_POSTING_ERR_IND) ? "" : x.INCOMPLETE_POSTING_ERR_IND,
+                    INSTITUTION_CODE_3 = string.IsNullOrWhiteSpace(x.INSTITUTION_CODE_3) ? "" : x.INSTITUTION_CODE_3  
+
+                }).ToList() ?? new List<TransactionRecord>();
+
+            transactions = new List<TransactionRecord>(allTransactions); // show full list initially
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching transactions: {ex.Message}");
+        }
+    }
+
+//     private async Task LoadTransactionsAsync()
+// {
+//     try
+//     {
+//         Simulate async operation
+//         await Task.Delay(200);
+
+//         allTransactions = Enumerable.Range(1, 25).Select(i => new TransactionRecord
+//         {
+//             DD_NUM = $"DD{1000 + i}",
+//             MEMO = $"Memo Text {i}",
+//             INCOME_SOURCE_TYPE = new[] { "SSI", "VA", "SSA" }[i % 3],
+//             PatientName = $"Patient {Convert.ToChar(64 + i)}",
+//             AFFINITY_ACCT_NUM = $"ACCT{2000 + i}",
+//             MRUN = $"MRUN{3000 + i}",
+//             DECEASED = (i % 3 == 0) ? "Y" : "N",
+//             Institution = new[] { "Inst1", "Inst2", "Inst3" }[i % 3],
+//             BankDate = DateTime.Today.AddDays(-i * 5),
+//             CREATED_DATETIME = DateTime.Today.AddDays(-i * 2),
+//             BAI_FILE_ID = i,
+//             INVALID_RECORD_ID = 10000 + i,
+//             INVALID_REC_ERR_MSG = i % 4 == 0 ? "Example error message." : string.Empty,
+//             PFAmount = Math.Round(100 + i * 10.5m, 2),
+//             INCOMPLETE_POSTING_ERR_IND = (i % 4 == 0) ? "Y" : ""
+//         }).ToList();
+
+//         transactions = new List<TransactionRecord>(allTransactions);
+//     }
+//     catch (Exception ex)
+//     {
+//         Console.WriteLine($"Error loading dummy transactions: {ex.Message}");
+//     }
+// }
+
+
+ 
+
+    private void OnSearchChanged(object value)
+    {
+        searchTerm = value?.ToString() ?? string.Empty;
+
+        if (searchTerm.Length >= 3)
+        {
+            transactions = allTransactions
+                .Where(t =>
+                    (t.DD_NUM?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.PatientName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.AFFINITY_ACCT_NUM?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.MRUN?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.MEMO?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.Institution?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.BankDate?.ToString("yyyy-MM-dd")?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.AS_OF_DATETIME?.ToString("yyyy-MM-dd")?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.CREATED_DATETIME?.ToString("yyyy-MM-dd")?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (t.INCOME_SOURCE_TYPE?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false)) 
+                .ToList();
+        }
+        else
+        {
+            transactions = new List<TransactionRecord>(allTransactions);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task OnTransactionTypeChanged(object value)
+    {
+        selectedType = value?.ToString() ?? "Valid Transactions";
+        await LoadTransactionsAsync();
+    }
+
+    private async Task ShowExpandedTable()
+    {
+        var heading = "Pre-Edit Transactions";
+        await DialogService.OpenAsync<ExpandedTransactionTable>(heading,
+    new Dictionary<string, object>
+        {
+            ["transactions"] = transactions,
+            ["SelectedTypeFromParent"] = selectedType
+        },
+      new DialogOptions() { Width = "80vw", Height = "90vh", Resizable = true });
+    }
+
+    private async Task OnEdit(TransactionRecord record)
+    {
+        var result = await DialogService.OpenAsync<EditTransactionDialog>(
+            "Edit Transaction",
+            new Dictionary<string, object> { ["Transaction"] = record },
+            new DialogOptions() { Width = "600px", Height = "500px", Resizable = true });
+
+        if (result is TransactionRecord updated)
+        {
+            await LoadTransactionsAsync();
+        }
+    }
+   
+    private bool showFilterPanel = false;
+
+    private TransactionFilterModel filterModel = new();
+
+    private class TransactionFilterModel
+    {
+        public string? DD_NUM { get; set; }
+        public string? MEMO { get; set; }
+        public string? INCOME_SOURCE_TYPE { get; set; }
+        public string? PatientName { get; set; }
+        public string? AFFINITY_ACCT_NUM { get; set; }
+        public string? MRUN { get; set; }
+        public string? Institution { get; set; }
+        public DateTime? BankDate { get; set; }
+        public DateTime? CreatedDate { get; set; }
+        public DateTime? FUNB_AsOf { get; set; }
+    }
+
+    private void ApplyMultiFilter()
+    {
+        if (string.IsNullOrWhiteSpace(filterSelection.SelectedField) || string.IsNullOrWhiteSpace(filterSelection.FilterValue))
+        {
+            transactions = new List<TransactionRecord>(allTransactions);
+            showFilterPanel = false;
+            return;
+        }
+
+        Func<string?, string?, bool> matcher = (source, query) =>
+        {
+            if (source == null) return false;
+
+            if (!filterSelection.MatchCase)
+            {
+                source = source.ToLower();
+                query = query.ToLower();
+            }
+
+            return filterSelection.ExactMatch ? source == query : source.Contains(query);
+        };
+
+        transactions = allTransactions.Where(t =>
+        {
+            var property = t.GetType().GetProperty(filterSelection.SelectedField ?? "");
+            if (property == null) return false;
+
+            var value = property.GetValue(t)?.ToString();
+            return matcher(value, filterSelection.FilterValue);
+        }).ToList();
+
+        showFilterPanel = false;
+    }
+
+    private void ResetMultiFilter()
+    {
+        filterSelection = new();
+        transactions = new List<TransactionRecord>(allTransactions);
+        showFilterPanel = false;
+    }
+
+
+    private async Task ValidateUnvalidatedTransactions()
+    {
+        isValidating = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await FileloadService.ValidateUnvalidatedRecordsAsync();
+
+            if (success)
+            {
+                NavigationManager.NavigateTo("/view-transactions");
+            }
+            
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = $"An error occurred: {ex.Message}",
+                    Duration = 4000
+                });
+        }
+        finally
+        {
+            isValidating = false;
+            StateHasChanged();
+        }
+    }
+
+
+    private async Task OnDelete(TransactionRecord record)
+    {
+        bool? confirmed = await DialogService.Confirm(
+            $"Are you sure you want to delete DD #{record.DD_NUM}?",
+            "Delete Confirmation");
+
+        if (confirmed == true)
+        {
+            try
+            {
+                isDeleting = true;
+                StateHasChanged();
+
+                bool success = await PreEditService.DeletePreEditAsync(record.INVALID_RECORD_ID);
+
+                if (success)
+                {
+                    NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Success,
+                            Summary = "Deleted",
+                            Detail = $"DD #{record.DD_NUM} has been deleted.",
+                            Duration = 4000
+                        });
+                    await LoadTransactionsAsync();
+                }
+                else
+                {
+                    NotificationService.Notify(new NotificationMessage
+                        {
+                            Severity = NotificationSeverity.Error,
+                            Summary = "Delete Failed",
+                            Detail = "The server was unable to delete the record.",
+                            Duration = 4000
+                        });
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error",
+                        Detail = $"An error occurred: {ex.Message}",
+                        Duration = 4000
+                    });
+            }
+            finally
+            {
+                isDeleting = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task OnOverrideAsync()
+    {
+        if (selectedTransaction == null || selectedTransaction.INVALID_RECORD_ID == null)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = "No transaction selected.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        bool success = await PreEditService.MoveToValidAsync(selectedTransaction.INVALID_RECORD_ID);
+
+        if (success)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Override Successful",
+                Detail = $"DD #{selectedTransaction.DD_NUM} moved to valid.",
+                Duration = 4000
+            }); 
+            showPanel = false;
+            await LoadTransactionsAsync();
+        }
+        else
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Override Failed",
+                Detail = "Server was unable to move the record.",
+                Duration = 4000
+            });
+        }
+    }
+
+      RenderFragment RenderTransactionGrid(List<TransactionRecord> list, bool showActions) => __builder =>
+ {
+     <RadzenDataGrid TItem="TransactionRecord" Data="@list"
+         AllowPaging="true" PageSize="12" AllowSorting="true" ColumnWidth="auto" class="rz-datagrid centered-grid" @ref="grid"
+         ExpandMode="DataGridExpandMode.Single" RowSelect="@OnRowSelect">
+         <Columns>
+              <RadzenDataGridColumn TItem="TransactionRecord" Property="DD_NUM" Title="DD #" Width="100px" />
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="INCOME_SOURCE_TYPE" Title="Income Source" Width="200px" />
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="PatientName" Title="Name" Width="200px" />
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="AFFINITY_ACCT_NUM" Title="Account #" Width="200px" />
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="MRUN" Title="MRUN" Width="200px" />
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="DECEASED" Title="Deceased" Width="200px" />
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="Institution" Title="Institution" Width="200px" />
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="BankDate" Title="FUNB As of " FormatString="{0:yyyy-MM-dd}" Width="200px" />
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="PFAmount" Title="FUNB Amount" Width="200px" />
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="CREATED_DATETIME" Title="Created Date" FormatString="{0:yyyy-MM-dd}" Width="200px" />
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="BankDate" Title="BANK DATE" FormatString="{0:yyyy-MM-dd}" Width="200px" />
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="MEMO" Title="Memo" Width="200px" />
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="INCOMPLETE_POSTING_ERR_IND" Title="POSTING ERROR" Width="200px" />          
+         @if (showActions)
+             {
+             <RadzenDataGridColumn TItem="TransactionRecord" Property="INCOMPLETE_POSTING_ERR_IND" Title="POSTING ERROR" />
+                 <RadzenDataGridColumn TItem="TransactionRecord" Title="Error Message" Width="300px">
+                     <Template Context="record">
+                         <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: help;"
+                              title="@record.INVALID_REC_ERR_MSG">
+                             @Truncate(record.INVALID_REC_ERR_MSG, 50)
+                         </div>
+                     </Template>
+                 </RadzenDataGridColumn>
+
+
+             }
+         </Columns>
+
+  
+
+
+     </RadzenDataGrid>;
+     <div class="record-count-info">
+         Total: @list.Count record@(list.Count == 1 ? "" : "s")
+     </div>
+
+
+
+        void ShowFullError(string errorMsg)
+        {
+            DialogService.Open("Error Details", ds =>
+    @<div style="padding: 1rem; max-width: 600px;">
+        <p>@errorMsg</p>
+    </div>
+    ,
+    new DialogOptions { Width = "600px", Resizable = true });
+      }
+
+      string Truncate(string value, int length)
+      {
+          if (string.IsNullOrEmpty(value)) return value;
+          return value.Length <= length ? value : value.Substring(0, length) + "...";
+      }
+
+
+
+    };
+ public async void LoadPreEditData(){
+   StateHasChanged();
+
+     ClosePanel();
+     await LoadHiddenData();
+     await LoadTransactionsAsync();
+    StateHasChanged();
+
+ }
+}

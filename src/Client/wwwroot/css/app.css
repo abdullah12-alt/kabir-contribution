@@ -1,0 +1,231 @@
+
+@import url("https://fonts.googleapis.com/css?family=Poppins:300,400,500,600,700");
+
+html,
+body {
+    background: #fafafa;
+}
+
+/* Styling for Loader */
+.loader-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(255, 255, 255, 0.7);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    transform: translate(-50%, -50%);
+}
+
+.spinner {
+    border: 8px solid #f3f3f3;
+    border-top: 8px solid #007BFF;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+.loader-text {
+    font-size: 18px;
+    color: #333;
+}
+
+p {
+    font-size: 1.1em;
+    font-weight: 400;
+    line-height: 1.7em;
+    color: #000000;
+}
+
+a,
+a:hover,
+a:focus {
+    color: inherit;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+/* By default, hide the mobile toggle */
+.mobile-toggle {
+    display: none;
+}
+
+/* Show the mobile toggle on screens smaller than 992px */
+@media (max-width: 991px) {
+    .mobile-toggle {
+        display: inline-block;
+    }
+}
+
+.rz-notification-container.rz-notification-container-top-center {
+    position: static !important; /* or relative; removes fixed positioning */
+    transform: none !important;
+    margin-top: 1rem;
+    left: auto !important;
+    top: auto !important;
+}
+
+/* Hide loading spinner when Blazor is loaded */
+.loading-progress {
+    display: none !important;
+}
+
+.loading-progress-text {
+    display: none !important;
+}
+
+.rz-layout .rz-body {
+    transform: none;
+    overflow: hidden !important;
+}
+
+body:has(.rz-dialog) .rz-layout .rz-body {
+    overflow: hidden !important;
+}
+
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.rz-dialog-wrapper {
+    box-sizing: border-box;
+    display: flex;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    bottom: 0;
+    z-index: var(--rz-dialog-zindex);
+    align-items: flex-end;
+    justify-content: flex-end;
+}
+
+.rz-pager-page.rz-state-active {
+    color: #1976d2;
+}
+
+
+/* Margin Top */
+.mt-5 {
+    margin-top: 5px;
+}
+
+.mt-10 {
+    margin-top: 10px;
+}
+
+.mt-15 {
+    margin-top: 15px;
+}
+
+.mt-20 {
+    margin-top: 20px;
+}
+
+/* Margin Bottom */
+.mb-5 {
+    margin-bottom: 5px;
+}
+
+
+.mb-10 {
+    margin-bottom: 10px;
+}
+
+.mb-15 {
+    margin-bottom: 15px;
+}
+
+.mb-20 {
+    margin-bottom: 20px;
+}
+
+/* Margin Left */
+.ml-5 {
+    margin-left: 5px;
+}
+
+.ml-10 {
+    margin-left: 10px;
+}
+
+.ml-15 {
+    margin-left: 15px;
+}
+
+.ml-20 {
+    margin-left: 20px;
+}
+
+/* Margin Right */
+.mr-5 {
+    margin-right: 5px;
+}
+
+.mr-10 {
+    margin-right: 10px;
+}
+
+.mr-15 {
+    margin-right: 15px;
+}
+
+.mr-20 {
+    margin-right: 20px;
+}
+
+/* Margin All Sides */
+.m-5 {
+    margin: 5px;
+}
+
+.m-10 {
+    margin: 10px;
+}
+
+.m-15 {
+    margin: 15px;
+}
+
+.m-20 {
+    margin: 20px;
+}
+
+.transaction-container {
+    background-color: #f9f9f9;
+    border-radius: 2px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.transaction-heading {
+    font-size: 24px;
+    font-weight: 600;
+    color: black;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.record-count-info {
+    text-align: right;
+    margin-top: 8px;
+    margin-right: 10px;
+    font-size: 14px;
+    color: #555;
+}
+

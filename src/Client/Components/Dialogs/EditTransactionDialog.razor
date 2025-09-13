@@ -1,0 +1,82 @@
+﻿@using Client.Models
+@inject DialogService DialogService
+@using Client.Services
+@inject PreEditService PreEditService
+
+<RadzenTemplateForm Data="@Transaction" TItem="TransactionRecord" Submit="@OnSubmit" >
+    <div class="rz-grid rz-form-layout rz-gap-3 rz-cols-1 md:rz-cols-2">
+
+        @* <RadzenLabel Text="DD Number" Component="DD_NUM" /> *@
+        @* <RadzenTextBox @bind-Value="Transaction.DD_NUM" Name="DD_NUM" Style="width: 100%;" /> *@
+
+        <div class="">
+            <RadzenLabel Text="Account Number" Component="AFFINITY_ACCT_NUM" />
+            <RadzenTextBox @bind-Value="Transaction.AFFINITY_ACCT_NUM" Name="AFFINITY_ACCT_NUM" Style="width: 100%;" />
+
+            <RadzenLabel Text="Income Source" Component="INCOME_SOURCE_TYPE" />
+            <RadzenTextBox @bind-Value="Transaction.INCOME_SOURCE_TYPE" Name="INCOME_SOURCE_TYPE" Style="width: 100%;" />
+        </div>
+    
+
+        <RadzenLabel Text="MRUN" Component="MRUN" />
+        <RadzenTextBox @bind-Value="Transaction.MRUN" Name="MRUN" Style="width: 100%;" />
+
+        <RadzenLabel Text="Bank Date" Component="BankDate" />
+        <RadzenDatePicker @bind-Value="Transaction.BankDate" Name="BankDate" Style="width: 100%;" />
+
+        @* <RadzenLabel Text="Created Date" Component="CREATED_DATETIME" /> *@
+        @* <RadzenDatePicker @bind-Value="Transaction.CREATED_DATETIME" Name="CREATED_DATETIME" Style="width: 100%;" /> *@
+    </div>
+
+    <div class="rz-mt-4 rz-text-right">
+        <RadzenButton Text="Cancel"
+                      ButtonStyle="Radzen.ButtonStyle.Secondary"
+                      Click="@Cancel"
+                      Style="margin-right: 8px;" />
+        <RadzenButton Text="Save"
+                      ButtonType="Radzen.ButtonType.Submit"
+                      ButtonStyle="Radzen.ButtonStyle.Primary" />
+    </div>
+</RadzenTemplateForm>
+
+
+@code {
+    [Parameter] public TransactionRecord? Transaction { get; set; }
+
+    private void Cancel()
+    {
+        DialogService.Close(null);
+    }
+
+    private async Task OnSubmit()
+    {
+        if (Transaction is null || Transaction.INVALID_RECORD_ID == null)
+        {
+            Console.WriteLine("Missing transaction data.");
+            return;
+        }
+
+        var dto = new InvalidRecordDto
+            {
+              
+                AFFINITY_ACCT_NUM=Transaction.AFFINITY_ACCT_NUM,
+                INVALID_RECORD_ID = Transaction.INVALID_RECORD_ID.Value,
+                DD_NUM = Transaction.DD_NUM,
+                MEDICAL_RECORD_NUM = Transaction.MRUN,
+                FUNB_INCOME_SRC_TYPE = Transaction.INCOME_SOURCE_TYPE,
+                AS_OF_DATETIME = Transaction.AS_OF_DATETIME ?? Transaction.BankDate,
+                CREATED_DATETIME = Transaction.CREATED_DATETIME ?? DateTime.Now
+            };
+
+        bool success = await PreEditService.SavePreEditAsync(dto);
+
+        if (success)
+        {
+            DialogService.Close(Transaction);
+        }
+        else
+        {
+            Console.WriteLine("Failed to save transaction.");
+        }
+    }
+}

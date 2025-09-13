@@ -1,0 +1,93 @@
+﻿@using Models
+@using Client.Services;
+@inject IncomeSourceTypeService IncomeSourceTypeService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<EditForm Model="@IncomeSourceType" OnValidSubmit="OnValidSubmit">
+    <RadzenTemplateForm TItem="IncomeSourceType" Context="formContext" >
+    <div class="rz-grid rz-form-layout rz-gap-3 rz-cols-1 md:rz-cols-2">
+            <div class="row">
+                @if (IncomeSourceType.INCOME_SOURCE_TYPE_ID == 0)  // Only show during Add
+                {
+                    <div class="half">
+                        <RadzenLabel Text="FUNB Code" Component="FunbCodeBox" Style="display:block; margin-bottom:4px;" />
+                        <RadzenTextBox @bind-Value="IncomeSourceType.FUNB_INCOME_SRC_TYPE" Name="FUNB Code" Placeholder="FUNB Code" Style="width:100%" id="FunbCodeBox" />
+                    </div>
+                }
+                else
+                {
+                    <!-- Hidden input: still posts value to API -->
+                    <RadzenTextBox @bind-Value="IncomeSourceType.FUNB_INCOME_SRC_TYPE" Style="display:none;" />
+                }
+
+
+                <div class="half">
+                    <RadzenLabel Text="Description" Component="DescriptionBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="IncomeSourceType.INCOME_SRC_TYPE_DESCR" Name="Description" Placeholder="Description" Style="width:100%" id="DescriptionBox" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="half">
+                    <RadzenLabel Text="PA Code" Component="PaCodeBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="IncomeSourceType.PA_INCOME_SRC_TYPE" Name="PA Code" Placeholder="PA Code" Style="width:100%" id="PaCodeBox" />
+                </div>
+                <div class="half">
+                    <RadzenLabel Text="PA PMT Code" Component="PaPmtCodeBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="IncomeSourceType.PA_PMT_CODE" Name="PA PMT Code" Placeholder="PA PMT Code" Style="width:100%" id="PaPmtCodeBox" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="half">
+                    <RadzenLabel Text="PA PMT REV Code" Component="PaPmtRevCodeBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="IncomeSourceType.PA_PMT_REV_CODE" Name="PA PMT REV Code" Placeholder="PA PMT REV Code" Style="width:100%" id="PaPmtRevCodeBox" />
+                </div>
+                <div class="half">
+                    <RadzenLabel Text="PF DEP TRANS Code" Component="PfDepTransCodeBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="IncomeSourceType.PF_DEP_TRANS_CODE" Name="PF DEP TRANS Code" Placeholder="PF DEP TRANS Code" Style="width:100%" id="PfDepTransCodeBox" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="half">
+                    <RadzenLabel Text="PF DEP REV TRANS Code" Component="PfDepRevTransCodeBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="IncomeSourceType.PF_DEP_REV_TRANS_CODE" Name="PF DEP REV TRANS Code" Placeholder="PF DEP REV TRANS Code" Style="width:100%" id="PfDepRevTransCodeBox" />
+                </div>
+             </div>
+            <div class="rz-mt-4 rz-text-right">
+                <RadzenButton Text="Save" Click="@OnValidSubmit" ButtonStyle="Radzen.ButtonStyle.Secondary" ButtonType="Radzen.ButtonType.Submit" Style="margin-top: 16px;" />
+                <RadzenButton Text="Cancel" ButtonStyle="Radzen.ButtonStyle.Danger" Click="@(args => DialogService.Close(null))" Style="margin-top: 16px; margin-left: 8px;" />
+            </div>
+        </div>
+    </RadzenTemplateForm>
+</EditForm>
+
+@code {
+    [Parameter] public IncomeSourceType IncomeSourceType { get; set; } = new();
+
+    private async Task OnValidSubmit()
+    {
+        bool success = await IncomeSourceTypeService.CreateOrUpdateAsync(IncomeSourceType, 
+            IncomeSourceType.INCOME_SOURCE_TYPE_ID == 0 ? "I" : "U", "1");
+        if (success)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Saved",
+                Detail = "Income Source Type saved successfully.",
+                Duration = 8000
+            });
+            DialogService.Close(IncomeSourceType);
+        }
+        else
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Save Failed",
+                Detail = "The server was unable to save the record.",
+                Duration = 8000
+            });
+        }
+    }
+}

@@ -1,0 +1,77 @@
+﻿@using Radzen
+@using Radzen.Blazor
+
+<div class="segment-toolbar">
+    <RadzenTabs SelectedIndexChanged="@OnTabChanged" SelectedIndex="@ActiveTabIndex">
+        <Tabs>
+            @foreach (var tab in TabItems)
+            {
+                <RadzenTabsItem Style="align-items: self-start;" Icon="@tab.Icon" Text="@tab.Title">
+                    @tab.Content
+                </RadzenTabsItem>
+            }
+        </Tabs>
+    </RadzenTabs>
+</div>
+
+@if (ShowActions && ActionButtons != null)
+{
+    <div class="toolbar-actions">
+        @ActionButtons(ActiveTabIndex)
+    </div>
+}
+
+<style>
+    .segment-toolbar {
+        margin-bottom: 20px;
+    }
+
+    .toolbar-actions {
+        margin-bottom: 16px;
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+
+    .rz-tabview-title {
+        font-size: 18.4px;
+        font-weight:600;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public List<TabItem> TabItems { get; set; } = new();
+
+    [Parameter]
+    public int ActiveTabIndex { get; set; } = 0;
+
+    [Parameter]
+    public EventCallback<int> ActiveTabIndexChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnTabIndexChanged { get; set; }
+
+    [Parameter]
+    public bool ShowActions { get; set; } = true;
+
+    [Parameter]
+    public RenderFragment<int>? ActionButtons { get; set; }
+
+    public async Task OnTabChanged(int index)
+    {
+        ActiveTabIndex = index;
+
+        await ActiveTabIndexChanged.InvokeAsync(index);
+        await OnTabIndexChanged.InvokeAsync(index);
+    }
+
+    public class TabItem
+    {
+        public string Title { get; set; } = string.Empty;
+        public RenderFragment Content { get; set; } = default!;
+        public object? Data { get; set; }
+        public string Icon { get; set; }
+    }
+}
+

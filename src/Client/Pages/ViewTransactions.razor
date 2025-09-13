@@ -1,0 +1,407 @@
+﻿@page "/view-transactions"
+@using Radzen
+@using Radzen.Blazor
+@inject DialogService DialogService
+@using Models;
+@inject HttpClient Http
+@using Client.Components.Dialogs
+@using Client.Services;
+@inject PreEditService PreEditService
+@inject NotificationService NotificationService
+@inject NavigationManager NavigationManager
+<h3 style="margin-bottom: 30px;">View Transactions</h3>
+<div class="segment-toolbar">
+    <RadzenTabs SelectedIndexChanged="@OnTabChanged" SelectedIndex="@activeTabIndex">
+        <Tabs>
+            <RadzenTabsItem Text="Valid Transactions">
+                @RenderTransactionGrid(validTransactions, showActions: false)
+            </RadzenTabsItem>
+            <RadzenTabsItem Text="Invalid Transactions">
+                @RenderTransactionGrid(invalidTransactions, showActions: true)
+            </RadzenTabsItem>
+            <RadzenTabsItem Text="Unvalidated Transactions">
+                @RenderTransactionGrid(unvalidatedTransactions, showActions: true)
+            </RadzenTabsItem>
+
+        </Tabs>
+    </RadzenTabs>
+   
+</div>
+
+<div class="toolbar-actions rz-p-10">
+    @if (activeTabIndex == 0)
+    {
+
+        <RadzenButton   Click="@OnPost" Style="width: 160px; background-color: #007BFF;" Text="Post"  />
+    <RadzenButton  Click="@OnCancel"  Variant="Variant.Outlined" Style="width: 160px;" Text="Cancel" ButtonStyle="ButtonStyle.Danger" />
+     
+    }
+    else if (activeTabIndex == 1 || activeTabIndex == 2)
+    {
+        <RadzenButton Click="@OnValidate" Style="width: 160px; background-color: #007BFF;" Text="Pre-Edit" />
+        <RadzenButton Click="@OnPreEdit" Variant="Variant.Outlined" Style="width: 160px;" Text="Cancel" ButtonStyle="ButtonStyle.Danger" />
+    }
+</div>
+
+<style>
+    .segment-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+    .toolbar-actions {
+        margin-bottom: 16px;
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+
+    .rz-datagrid {
+        font-size: 0.95rem;
+    }
+
+    .row-actions {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .overlay-spinner {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.6);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+    /* Header font size */
+    .rz-datatable-header th,
+    .rz-grid-table thead th {
+        font-size: 16px !important;
+    }
+
+    .rz-column-title {
+        font-size: 20px !important;
+        text-align: center;
+    }
+
+    /* Row content font size */
+    .rz-grid-table td,
+    .rz-cell-data {
+        font-size: 14px !important;
+    }
+
+    /* Smaller icon buttons for Actions column */
+    .row-actions .rz-button {
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+        min-width: auto !important;
+        height: 32px !important;
+    }
+
+    .row-actions .rz-button .rz-button-icon {
+            font-size: 12px !important;
+    }
+
+
+    .rz-tabview-title {
+
+        font-size: 16px; /* Adjust as needed */
+
+    }
+
+    .rz-grid-table thead th .rz-column-title {
+        justify-content: center;
+    }
+
+    .record-count-info {
+        text-align: right;
+        margin-top: 8px;
+        margin-right: 10px;
+        font-size: 16px;
+        color: #555;
+    }
+    /* All Radzen DataGrid header titles */
+    .rz-column-title {
+        font-size: 16px !important;
+        text-align: center;
+    }
+
+    .rz-grid-table thead th .rz-column-title-content {
+        text-transform: none; /* disables uppercase */
+    
+    }
+
+    
+  
+    .main-item{
+        display: flex;
+        gap: 136px;
+        margin-bottom: 20px;
+    }
+
+  
+
+    
+</style>
+
+@if (isUploading)
+{ 
+    <div class="loader-overlay">
+        <div class="spinner"></div>
+        <div class="loader-text">Processing, please wait...</div>
+    </div>
+} 
+
+@code {
+    private bool isDeleting = false;
+    private int pageSize = 10;
+    private int activeTabIndex = 0;
+    private RadzenDataGrid<TransactionRecord>? grid;
+    private List<TransactionRecord> validTransactions = new();
+    private bool isUploading = false;
+    private List<TransactionRecord> invalidTransactions = new();
+    private List<TransactionRecord> unvalidatedTransactions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTransactionsAsync();
+    }
+
+    private async Task OnTabChanged(int index)
+    {
+        activeTabIndex = index;
+        await LoadTransactionsAsync();
+    }
+
+    private async Task LoadTransactionsAsync()
+    {
+        isUploading = true;
+        StateHasChanged();
+
+        try
+        {
+            var validApi = await Http.GetFromJsonAsync<List<WorkTransactionDto>>($"https://localhost:7045/api/transactions/valid?baiFileId");
+            var invalidApi = await Http.GetFromJsonAsync<List<WorkTransactionDto>>($"https://localhost:7045/api/transactions/invalid?baiFileId");
+            var unvalidatedApi = await Http.GetFromJsonAsync<List<WorkTransactionDto>>($"https://localhost:7045/api/transactions/unvalidated");
+
+
+            validTransactions = validApi?.Select(ToTransactionRecord).ToList() ?? new();
+            invalidTransactions = invalidApi?.Select(ToTransactionRecord).ToList() ?? new();
+            unvalidatedTransactions = unvalidatedApi?.Select(ToTransactionRecord).ToList() ?? new();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Load Failed",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+        }
+        finally
+        {
+            isUploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private TransactionRecord ToTransactionRecord(WorkTransactionDto x) => new()
+    {
+            DD_NUM = x.DD_NUM,
+            INCOME_SOURCE_TYPE = string.IsNullOrWhiteSpace(x.FUNB_INCOME_SRC_TYPE) ? "" : x.FUNB_INCOME_SRC_TYPE,
+            AFFINITY_ACCT_NUM = string.IsNullOrWhiteSpace(x.AFFINITY_ACCT_NUM) ? "" : x.AFFINITY_ACCT_NUM,
+            BankDate = x.AS_OF_DATETIME ?? DateTime.MinValue,
+            Institution = string.IsNullOrWhiteSpace(x.INSTITUTION_CODE) ? "" : x.INSTITUTION_CODE,
+            MRUN = string.IsNullOrWhiteSpace(x.MEDICAL_RECORD_NUM) ? "" : x.MEDICAL_RECORD_NUM,
+            CREATED_DATETIME = x.CREATED_DATETIME,
+            BAI_FILE_ID = x.BAI_FILE_ID,
+            INVALID_RECORD_ID = x.INVALID_RECORD_ID,
+            INVALID_REC_ERR_MSG = x.INVALID_REC_ERR_MSG,
+            PatientName = string.IsNullOrWhiteSpace(x.PATIENT_NAME) ? "" : x.PATIENT_NAME,
+            DECEASED = string.IsNullOrWhiteSpace(x.DECEASED_IND) ? "" : x.DECEASED_IND,
+            PFAmount = x.PFAmount == null ? 0 : x.PFAmount,
+            MEMO = string.IsNullOrWhiteSpace(x.MEMO) ? "" : x.MEMO,
+            INCOMPLETE_POSTING_ERR_IND = string.IsNullOrWhiteSpace(x.INCOMPLETE_POSTING_ERR_IND) ? "N/A" : x.INCOMPLETE_POSTING_ERR_IND
+    };
+
+    private async Task OnEdit(TransactionRecord record)
+    {
+        var result = await DialogService.OpenAsync<EditTransactionDialog>(
+            "Edit Transaction",
+            new Dictionary<string, object> { ["Transaction"] = record },
+            new DialogOptions { Width = "600px", Height = "500px", Resizable = true });
+
+        if (result is TransactionRecord)
+            await LoadTransactionsAsync();
+    }
+
+    private async Task OnDelete(TransactionRecord record)
+    {
+        bool? confirmed = await DialogService.Confirm($"Are you sure you want to delete DD #{record.DD_NUM}?", "Delete Confirmation");
+        if (confirmed == true)
+        {
+            isDeleting = true;
+            StateHasChanged();
+            bool success = await PreEditService.DeletePreEditAsync(record.INVALID_RECORD_ID);
+            if (success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Deleted",
+                    Detail = $"DD #{record.DD_NUM} has been deleted.",
+                    Duration = 4000
+                });
+                await LoadTransactionsAsync();
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Delete Failed",
+                    Detail = "The server was unable to delete the record.",
+                    Duration = 4000
+                });
+            }
+            isDeleting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ShowExpandedTable(List<TransactionRecord> list, string label)
+    {
+        await DialogService.OpenAsync<ExpandedTransactionTable>(label,
+            new Dictionary<string, object>
+            {
+                ["transactions"] = list,
+                ["SelectedTypeFromParent"] = label
+            },
+            new DialogOptions { Width = "80vw", Height = "90vh", Resizable = true });
+    }
+
+    private void OnValidate()
+    {
+        NavigationManager.NavigateTo("/preedit");
+    }
+
+    private async Task OnPost()
+    {
+        try
+        {
+            var response = await Http.PostAsync("https://localhost:7045/api/PostDeposits/post", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<PostResult>();
+                // NotificationService.Notify(new NotificationMessage
+                //     {
+                //         Severity = NotificationSeverity.Success,
+                //         Summary = "Posting Complete",
+                //         Detail = result?.Message ?? "Deposits posted successfully.",
+                //         Duration = 4000
+                //     });
+
+                NavigationManager.NavigateTo("/post-transactions");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Post Failed",
+                        Detail = error,
+                        Duration = 5000
+                    });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Unexpected Error",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+        }
+    }
+
+
+
+    private void OnPreEdit() => NotificationService.Notify(new NotificationMessage { Summary = "Pre-Edit clicked" });
+    private void OnCancel() => NotificationService.Notify(new NotificationMessage { Summary = "Cancel clicked" });
+
+
+
+    RenderFragment RenderTransactionGrid(List<TransactionRecord> list, bool showActions) => __builder =>
+    {
+        <RadzenDataGrid TItem="TransactionRecord" Data="@list"
+            AllowPaging="true" PageSize="@pageSize" AllowSorting="true" ColumnWidth="auto" class="rz-datagrid centered-grid" @ref="grid"
+            ExpandMode="DataGridExpandMode.Single">
+            <Columns>
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="DD_NUM" Title="DD #" Width="150px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="MEMO" Title="Memo" Width="150px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="INCOME_SOURCE_TYPE" Title="Income Source" Width="150px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="PatientName" Title="Name" Width="150px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="AFFINITY_ACCT_NUM" Title="Account #" Width="150px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="MRUN" Title="MRUN" Width="150px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="DECEASED" Title="Deceased" Width="150px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="Institution" Title="Institution" Width="150px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="BankDate" Title="FUNB As of " FormatString="{0:yyyy-MM-dd}" Width="150px"  />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="PFAmount" Title="FUNB Amount" Width="150px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="CREATED_DATETIME" Title="Created Date" FormatString="{0:yyyy-MM-dd}" Width="150px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="BankDate" Title="BANK DATE" FormatString="{0:yyyy-MM-dd}" Width="150px" />
+                @if (showActions)
+                {
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="INCOMPLETE_POSTING_ERR_IND" Title="POSTING ERROR" />
+                    <RadzenDataGridColumn TItem="TransactionRecord" Title="Error Message" Width="300px">
+                        <Template Context="record">
+                            <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: help;"
+                                 title="@record.INVALID_REC_ERR_MSG">
+                                @Truncate(record.INVALID_REC_ERR_MSG, 50)
+                            </div>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+
+                }
+            </Columns>
+
+  
+
+
+        </RadzenDataGrid>;
+        <div class="record-count-info">
+            Total: @list.Count record@(list.Count == 1 ? "" : "s")
+        </div>
+
+
+        
+
+        string Truncate(string value, int length)
+        {
+            if (string.IsNullOrEmpty(value)) return value;
+            return value.Length <= length ? value : value.Substring(0, length) + "...";
+        }
+
+
+
+    };
+    public class PostResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
+}
+

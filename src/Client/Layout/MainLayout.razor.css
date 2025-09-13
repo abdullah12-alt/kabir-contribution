@@ -1,0 +1,56 @@
+
+.rz-sidebar-toggle {
+    display: none;
+}
+
+.header {
+    background-color: #1976d2;
+    color: white;
+}
+
+.header-stack {
+    padding: 10px;
+}
+
+.header-title {
+    font-size: 1.25rem;
+    padding: 6px 0px 6px 12px;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-label {
+    font-size: 1rem;
+}
+
+.sidebar {
+    width: 220px;
+    background-color: #F2FBFF;
+    padding-top: 20px;
+}
+
+.side-overlay {
+    background: #dfe1e038;
+}
+
+.content {
+    padding: 16px;
+    overflow-y: scroll;
+    height: 100%
+}
+
+/* Profile Menu Styling */
+ul.rz-profile-menu .rz-navigation-item-icon-children {
+    color: white;
+}
+
+ul.rz-profile-menu {
+    background-color: transparent !important;
+    background-color: transparent !important;
+    border-inline-start: none !important;
+    padding-left: 0px !important;
+}

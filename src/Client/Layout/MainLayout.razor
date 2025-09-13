@@ -1,0 +1,180 @@
+﻿@inherits LayoutComponentBase
+@using Radzen
+@using Radzen.Blazor
+
+<RadzenLayout>
+    <!-- Top Bar -->
+    <RadzenHeader class="header">
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" 
+                     AlignItems="AlignItems.Center" 
+                     JustifyContent="JustifyContent.SpaceBetween"
+                     class="header-stack">
+
+
+            @* class="desktop-hide" for hidding the toggle  *@
+            <!-- Left side: Sidebar toggle + Title -->
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="10px">
+                <RadzenSidebarToggle  Click="@(() => sidebarExpanded = !sidebarExpanded)" />
+                <RadzenLabel Text="Direct Deposit System" class="header-title"  Style="font-size=24px"/>
+            </RadzenStack>
+
+            <!-- Right side: Signed-in user info -->
+            <div class="user-info">
+                <RadzenLabel Text="Signed in as mali1" class="user-label" />
+                <RadzenProfileMenu>
+                    <ChildContent>
+                        <RadzenProfileMenuItem Path="profile" Icon="settings" Text="Settings" />
+                        <RadzenProfileMenuItem Text="Logout" Value="Logout" Icon="power_settings_new" />
+                    </ChildContent>
+                </RadzenProfileMenu>
+            </div>
+          
+        </RadzenStack>
+    </RadzenHeader>
+
+  
+   
+    <RadzenSidebar @bind-Expanded="sidebarExpanded" class="sidebar">
+        <RadzenPanelMenu>
+            <RadzenPanelMenuItem Style="background-color: #F2FBFF; color: #213B54; border: none; font-size: 1.15rem; padding-bottom: 3px" Text="Home" Icon="home" />
+            <RadzenPanelMenuItem Style="background-color: #F2FBFF; color: #213B54; border: none; font-size: 1.15rem; padding-bottom: 3px" Text="Load & Validate" Icon="cloud_upload" Path="/" />
+            <RadzenPanelMenuItem Style="background-color: #F2FBFF; color: #213B54; border: none; font-size: 1.15rem; padding-bottom: 3px" Text="Pre-Edit File" Icon="edit_note" Path="/preedit" />
+            <RadzenPanelMenuItem Style="background-color: #F2FBFF; color: #213B54; border: none; font-size: 1.15rem; padding-bottom: 3px" Text="Post Transactions" Icon="sync_alt" Path="/post-transactions" />
+            <RadzenPanelMenuItem Style="background-color: #F2FBFF; color: #213B54; border: none; font-size: 1.15rem; padding-bottom: 3px" Text="Balance Direct Deposit" Icon="account_balance_wallet" Path="/balance" />
+            <RadzenPanelMenuItem Style="background-color: #F2FBFF; color: #213B54; border: none; font-size: 1.15rem; padding-bottom: 3px" Text="State Treasurer" Icon="account_balance" />
+            <RadzenPanelMenuItem Style="background-color: #F2FBFF; color: #213B54; border: none; font-size: 1.15rem; padding-bottom: 3px" Text="Reports" Icon="library_books" Path="/reports" />
+            <RadzenPanelMenuItem Style="background-color: #F2FBFF; color: #213B54; border: none; font-size: 1.15rem; padding-bottom: 3px"
+                                 Text="Settings"
+                                 Icon="settings"
+                                 Expanded="true">
+
+                <RadzenPanelMenuItem Style="background-color: #F2FBFF; color: #213B54; border: none; font-size: 1.1rem; padding-left: 20px"
+                                     Text="Income Sources"
+                                     Icon="supervisor_account"
+                                     Path="/settings/income-source" />
+
+                <RadzenPanelMenuItem Style="background-color: #F2FBFF; color: #213B54; border: none; font-size: 1.1rem; padding-left: 20px"
+                                     Text="Institutions"
+                                     Icon="domain"
+                                     Path="/settings/Institutions" />
+                <RadzenPanelMenuItem Style="background-color: #F2FBFF; color: #213B54; border: none; font-size: 1.1rem; padding-left: 20px"
+                                     Text="Regions"
+                                     Icon="public"
+                                     Path="/settings/regions" />
+                <RadzenPanelMenuItem Style="background-color: #F2FBFF; color: #213B54; border: none; font-size: 1.1rem; padding-left: 20px"
+                                     Text="DDS Configuration"
+                                     Icon="edit_note"
+                                     Path="/settings/dd-configuration" />
+            
+            </RadzenPanelMenuItem>
+        </RadzenPanelMenu>
+
+    </RadzenSidebar>
+
+    <!-- Main content area -->
+    <RadzenBody>
+        <RadzenNotification />
+        <RadzenDialog />
+        <div class="content">
+            @Body
+        </div>
+    </RadzenBody>
+
+    <!-- Styles -->
+    <style>
+            .rz-navigation-item-wrapper { 
+                background-color: transparent !important;
+            }
+
+            /* Prevent white background on hover */
+           .rz-navigation-item-wrapper:hover {
+                    background-color: #F2FBFF !important; /* or whatever color you prefer */
+                    color: #213B54 !important;
+           }
+
+           /* Optional: fix icon/text color on hover */
+           .rz-navigation-item-wrapper:hover .rz-link {
+                    color: #213B54 !important;
+          }
+
+        .rz-panel-menu .rz-navigation-item-link{
+            padding-left: 24px;
+        }
+
+        .rz-panel-menu .rz-navigation-item-wrapper:hover .rz-navigation-item-icon{
+            color: #213B54 !important;
+        }
+        .rz-panel-menu .rz-navigation-item-active,
+        .rz-panel-menu .rz-navigation-item-wrapper-active {
+            background-color: #baeaff !important;
+            color: #213B54 !important;
+        }
+
+
+        .rz-sidebar-toggle {
+            /* display: none; */
+            background-color: #1976d2;
+        }
+
+      
+        .header {
+            background-color: #1976d2;
+            color: white;
+        }
+
+        .header-stack {
+            padding: 10px;
+        }
+
+        .header-title {
+            font-size: 1.5rem;
+            padding: 6px 0px 6px 12px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-label {
+            font-size: 1rem;
+        }
+
+        .sidebar {
+            width:275px;
+            background-color: #F2FBFF;
+            padding-top: 20px;
+        }
+
+        .content {
+            padding: 16px;
+        }
+
+        /* Profile Menu Styling */
+        ul.rz-profile-menu .rz-navigation-item-icon-children {
+            color: white;
+        }
+
+        ul.rz-profile-menu {
+            background-color: transparent !important;
+            border-inline-start: none !important;
+            padding-left: 0px !important;
+        }
+
+        .rz-layout .rz-body {
+            grid-area: rz-body;
+            overflow-x: hidden !important;
+            /* overflow-y: hidden !important; */
+        }
+
+
+        .rz-data-row:hover {
+            cursor: pointer
+        }
+    </style>
+</RadzenLayout>
+
+@code {
+    private bool sidebarExpanded = true;
+}

@@ -1,0 +1,448 @@
+﻿@page "/"
+@using Client.Models
+@using Client.Services
+@using Client.Library
+@inject DDConfigService DDConfigService
+@inject NotificationService NotificationService
+@inject NavigationManager Navigation
+@inject FileloadService FileloadService
+@inject INewTabService NewTabService
+
+<h3 style="margin-bottom: 30px;">Load & Validate</h3>
+
+
+
+<div class="step-content">
+    @if (hasUnvalidatedTransactions)
+    {
+        <div style="background-color: #ffe5e5; font-size:16px; color: #8a0000; padding: 12px; border-left: 6px solid #f44336; margin-bottom: 20px;">
+            ⚠️ You have pending transactions, which need to be validated before a new file is loaded.
+        </div>
+    }
+    <p class="container-heading">Load BAI Bank File and CSV Detail File for Validation</p>
+
+<div class="upload-container" @ondragover:preventDefault @ondrop:preventDefault>
+
+    <div class="upload-row">
+        <label class="upload-label">BAI File</label>
+        <RadzenUpload @ref="bankUploadComponent"
+                      @key="@bankUploadKey"
+                      Multiple="false"
+                      Auto="false"
+                      Accept=".bai,.bai2"
+                      Progress="OnBankProgress"
+                      Change="OnBankFileChange"
+                      ChooseText="Browse"
+                          Disabled="@hasUnvalidatedTransactions"
+                      Style="@(uploadedBankFiles.Count > 0 ? "display: none;" : "flex: 1; text-align: right;")" />
+
+        @if (uploadedBankFiles.Count > 0)
+        {
+            <div class="file-preview">
+                <span>@uploadedBankFiles.First().Name</span>
+                <RadzenButton Icon="close" Size="Radzen.ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
+                              Click="RemoveBankFile" />
+            </div>
+        }
+    </div>
+
+    <div class="upload-row">
+        <label class="upload-label">CSV File</label>
+        <!-- Always rendered but hidden when file exists -->
+        <RadzenUpload @ref="detailUploadComponent"
+                      @key="@csvUploadKey"
+                      Multiple="false"
+                      Auto="false"
+                      Accept=".csv"
+                      Progress="OnDetailProgress"
+                      Change="OnDetailFileChange"
+                      ChooseText="Browse"
+                          Disabled="@hasUnvalidatedTransactions"
+                      Style="@(uploadedDetailFiles.Count > 0 ? "display: none;" : "flex: 1; text-align: right;")" />
+
+        <!-- File preview when uploaded -->
+        @if (uploadedDetailFiles.Count > 0)
+        {
+            <div class="file-preview">
+                <span>@uploadedDetailFiles.First().Name</span>
+                <RadzenButton Icon="close" Size="Radzen.ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
+                              Click="RemoveDetailFile" />
+            </div>
+        }
+    </div>
+
+</div>
+
+<RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center" Gap="1rem" Wrap="FlexWrap.Wrap" Class="rz-p-12">
+        @if (hasUnvalidatedTransactions)
+        {
+            <RadzenButton Click="ValidateUnvalidatedTransactions"
+                          Style="width: 160px; background-color: #007BFF;"
+                          Text="Validate" />
+        }
+        else
+        {
+            <RadzenButton Click="UploadToServer"
+                          Style="width: 160px; background-color: #007BFF;"
+                          Text="Load & Validate"
+                          Disabled="!FilesReadyToUpload" />
+        }
+
+        <RadzenButton Click="ShowCancelDialog" Variant="Variant.Outlined" Style="width: 112px;" Text="Cancel" Disabled="!FilesReadyToUpload || hasUnvalidatedTransactions" ButtonStyle="ButtonStyle.Danger" />
+</RadzenStack>
+</div>
+@if (showOverlay)
+{
+    <div class="overlay">
+        <div class="progress-container">
+            <p style="color: white;">In Progress... @currentProgress%</p>
+            <RadzenProgressBar ProgressBarStyle="ProgressBarStyle.Secondary" Value="@currentProgress"
+                               ShowValue="true"
+                               Style="width: 500px;" />
+        </div>
+    </div>
+}
+
+
+<style>
+   
+    .overlay {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.6);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        transform: translate(-50%, -50%);
+    }
+
+    .progress-container {
+        text-align: center;
+        padding: 2rem;
+        background: rgba(0, 0, 0, 0.7);
+        border-radius: 12px;
+    }
+
+    .file-preview {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        width: 100%;
+    }
+
+        .file-preview span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+    .container-heading {
+        color:black;
+        font-size:18px;
+        margin-bottom: 20px;
+        margin-top: 11px;
+    }
+
+    .step-content p{
+        color: black;
+
+    }
+
+    .rz-p-12 {
+        padding: 1rem !important;
+    }
+
+    .upload-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem 0;
+    }
+
+    .upload-row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        width: 100%;
+    }
+
+    .upload-label {
+        font-size: 16px;
+        min-width: 80px;
+        font-weight: bold;
+        text-align: left;
+    }
+
+    .file-preview {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex: 1;
+        background: #f8f8f8;
+        padding: 0.5rem;
+        border-radius: 6px;
+        font-size: 16px;
+    }
+
+    .rz-dialog-titlebar {
+        background-color: #F2FBFF;
+    }
+
+    .rz-button-text {
+        font-size: 16px;
+    }
+
+    .rz-button.rz-base.rz-shade-default {
+        background-color: #F2FBFF;
+        color: #f9777f;
+        border: 2px solid #f9777f;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 2px;
+        cursor: pointer;
+        transition: all 0.3s ease-in-out;
+    }
+
+    .rz-fileupload-buttonbar{
+        border: 1.5px solid #DDE2E6;
+    }
+
+    .step-content {
+        /*    height: 430px;*/
+        height: auto !important;
+        margin: 10px 0;
+        border-radius: 4px;
+        
+        width: 96%;
+        padding: 20px 30px 15px 30px;
+        background-color: #FFFFFF;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+        .step-content h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .step-content p {
+            color: #666;
+        }
+
+    /* .rz-progressbar-label, .rz-progressbar-label-value{ */
+    /*     background-color: #007bff; */
+    /*     color:#ffff; */
+    /* } */
+ 
+</style>
+
+
+
+@code {
+    [Inject]
+    private NavigationManager NavigationManager { get; set; }
+    [Inject] IJSRuntime JS { get; set; }
+
+    [Parameter] public EventCallback OnStepComplete { get; set; }
+    private bool showOverlay = false;
+    private int currentProgress = 0;
+
+    private bool shouldNavigate = false;
+
+    private RadzenUpload? bankUploadComponent;
+    private RadzenUpload? detailUploadComponent;
+    private List<Radzen.FileInfo> uploadedBankFiles = [];
+    private List<Radzen.FileInfo> uploadedDetailFiles = [];
+    private bool FilesReadyToUpload => uploadedBankFiles.Count > 0 && uploadedDetailFiles.Count > 0;
+    private bool isUploading = false;
+    private Guid bankUploadKey = Guid.NewGuid();
+    private Guid csvUploadKey = Guid.NewGuid();
+    private bool hasUnvalidatedTransactions = false;
+
+    private async Task ShowCancelDialog()
+    {
+        var result = await DialogService.Confirm(
+            "Are you sure you want to cancel this transaction process?",
+            "Confirm Cancellation",
+            new ConfirmOptions { OkButtonText = "Yes", CancelButtonText = "No" });
+
+        if (result == true)
+        {
+            Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+        }
+    }
+    private void RemoveBankFile()
+    {
+        // Reset the upload component by generating a new key
+        bankUploadKey = Guid.NewGuid();
+        uploadedBankFiles.Clear();
+        StateHasChanged();
+    }
+
+
+    private async Task ValidateUnvalidatedTransactions()
+    {
+        var success = await FileloadService.ValidateUnvalidatedRecordsAsync();
+
+        if (success)
+        {
+            // Optionally refresh data or state
+            hasUnvalidatedTransactions = false;
+            NavigationManager.NavigateTo("/view-transactions");
+            StateHasChanged();
+
+        }
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        hasUnvalidatedTransactions = await FileloadService.CheckIfWorkFileExistsAsync();
+    }
+    private void RemoveDetailFile()
+    {
+        csvUploadKey = Guid.NewGuid(); 
+
+        uploadedDetailFiles.Clear();
+
+        StateHasChanged();
+    }
+    private async void OnBankFileChange(UploadChangeEventArgs args) => await HandleFileChange(args, uploadedBankFiles, "Bank", ".bai,.bai2");
+    private async void OnDetailFileChange(UploadChangeEventArgs args) => await HandleFileChange(args, uploadedDetailFiles, "Detail", ".csv");
+
+    private async Task HandleFileChange(UploadChangeEventArgs args, List<Radzen.FileInfo> fileList, string fileType, string acceptedFormats)
+    {
+        if (args.Files?.Any() != true) return;
+
+        var file = args.Files.FirstOrDefault();
+        if (file != null)
+        {
+            var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+        }
+        var validExtensions = acceptedFormats.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(e => e.Trim().ToLowerInvariant());
+
+
+        if (fileList.Any())
+        {
+            var confirm = await DialogService.Confirm(
+                $"A {fileType.ToLower()} file is already uploaded. Replace it?",
+                $"Replace {fileType} File?",
+                new ConfirmOptions { OkButtonText = "Yes", CancelButtonText = "No" });
+
+            if (confirm != true) return;
+            fileList.Clear();
+        }
+
+        fileList.Add(file!);
+        StateHasChanged();
+    }
+
+    private void OnBankProgress(UploadProgressArgs args) => Console.WriteLine($"Bank file upload progress: {args.Progress}%");
+    private void OnDetailProgress(UploadProgressArgs args) => Console.WriteLine($"Detail file upload progress: {args.Progress}%");
+
+    // // private async Task OnSuccess()
+    // {
+    //     string reportUrl = "http:desktop-pqbt7k3/ReportServer/Pages/ReportViewer.aspx?%2fSSRS%2fPreEdit&rs:Command=Render";
+    //     await NewTabService.OpenUrlInNewTab(reportUrl);
+    // }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (shouldNavigate)
+        {
+            shouldNavigate = false;
+            NavigationManager.NavigateTo("/preedit");
+        }
+    }
+
+    private async Task UploadToServer()
+    {
+        if (!FilesReadyToUpload || isUploading)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Cannot Upload",
+                    Detail = "Files are missing or upload is already in progress.",
+                    Duration = 7000
+                });
+            return;
+        }
+
+        isUploading = true;
+        showOverlay = true;
+        currentProgress = 0;
+        StateHasChanged();
+
+        try
+        {
+            var timer = new System.Timers.Timer(100);
+            timer.Elapsed += (s, e) =>
+            {
+                if (currentProgress < 95)
+                {
+                    currentProgress += 1;
+                    InvokeAsync(StateHasChanged);
+                }
+            };
+            timer.Start();
+
+            var bankFile = uploadedBankFiles.First();
+            var detailFile = uploadedDetailFiles.First();
+
+
+            var success = await FileloadService.LoadFilesAsync(bankFile, detailFile);
+
+            timer.Stop();
+            currentProgress = 100;
+            StateHasChanged();
+
+            await Task.Delay(500); 
+            showOverlay = false;
+            if (success)
+            {
+                var reportUrl1 = "http://desktop-pqbt7k3/ReportServer/Pages/ReportViewer.aspx?/SSRS/PreEdit&rs:Command=Render";
+                var reportUrl2 = "http://desktop-pqbt7k3/ReportServer/Pages/ReportViewer.aspx?/SSRS/DeceasedRpt&rs:Command=Render";
+                await NewTabService.OpenUrlInNewTab(reportUrl1);
+                await NewTabService.OpenUrlInNewTab(reportUrl2);
+
+
+
+                // await JS.InvokeVoidAsync("eval", $"window.open('{reportUrl}', '_blank');");
+                // await this.OnSuccess();
+                shouldNavigate = true;
+                StateHasChanged(); 
+            }
+          
+
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Load Error",
+                    Detail = $"Unexpected error: {ex.Message}",
+                    Duration = 8000
+                });
+        }
+        finally
+        {
+            isUploading = false;
+            showOverlay = false;
+            currentProgress = 0;
+            StateHasChanged();
+        }
+    }
+
+
+
+}

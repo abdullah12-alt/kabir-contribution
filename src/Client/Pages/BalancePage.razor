@@ -1,0 +1,266 @@
+﻿@page "/balance"
+@using Client.Models
+@using Client.Library
+@using Radzen
+@using Radzen.Blazor
+@using Client.TabController
+
+@inject HttpClient Http
+@inject NotificationService NotificationService
+@inject NavigationManager NavigationManager
+
+<div class="page-header">
+    <h3>Auto Balance Direct Deposit</h3>
+</div>
+
+<ReusableTabController
+    TabItems="@tabItems"
+    @bind-ActiveTabIndex="@activeTabIndex"
+    OnTabIndexChanged="@HandleTabChanged"
+    ShowActions="true"
+    ActionButtons="@RenderActionButtons" />
+<style>
+    /* Header font size */
+    .rz-datatable-header th,
+    .rz-grid-table thead th {
+        font-size: 16px !important;
+
+    }
+
+        .rz-grid-table thead th .rz-column-title-content {
+            text-transform: none; /* disables uppercase */
+            padding: 4px;
+        }
+   
+
+    /* Smaller icon buttons for Actions column */
+    .row-actions .rz-button {
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+        min-width: auto !important;
+        height: 32px !important;
+    }
+
+     .row-actions .rz-button .rz-button-icon {
+            font-size: 12px !important;
+     }
+    /* All Radzen DataGrid header titles */
+    .rz-column-title {
+        font-size: 16px !important;
+        text-align:center;
+     } 
+
+
+    .rz-grid-table thead th .rz-column-title { 
+        justify-content: center;
+    }
+    .rz-datagrid {
+        font-size: 14px;
+    }
+    .row-actions {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+    }
+    .balance-summary th{
+     font-size: 16px;
+
+    }
+     .balance-summary td{
+     font-size: 14px;
+
+     }
+   .balance-summary th,
+    .balance-summary td {
+        padding-top: 12px;
+        padding-bottom: 12px;
+    }
+
+    .no-border-cell {
+        border: 0 !important;
+        box-shadow: none !important;
+        background-color: transparent !important;
+    }
+</style>
+
+@code {
+    private int activeTabIndex = 0;
+    private BalanceSummaryDto? summary;
+    private List<InvalidRecordDto> invalidRecords = new();
+    private List<SummaryRecordDto> summaryRecords = new();
+    private List<BalanceSummaryRowDto> balanceSummaryList = new();
+    private List<ReusableTabController.TabItem> tabItems = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllAsync();
+
+        tabItems = new List<ReusableTabController.TabItem>
+        {
+          new ReusableTabController.TabItem
+    {
+        Title = "Auto Balance Summary",
+        Content = @<div style="width: 50%; margin: 0 auto;">
+            <DdsTable TItem="BalanceSummaryRowDto"
+                      Data="@balanceSummaryList"
+                      Columns="@balanceSummaryColumns"
+                      AllowSorting="false" />
+             </div>
+            },
+            new ReusableTabController.TabItem
+            {
+                Title = "Invalid Records",
+            
+            
+                Content = @<DdsTable TItem="InvalidRecordDto"
+                                    Data="@invalidRecords"
+                                    Columns="@invalidColumns"
+                                    AllowSorting="true" />
+            },
+            new ReusableTabController.TabItem
+            {
+                Title = "FUNB Summary Records",
+                Content = @<DdsTable TItem="SummaryRecordDto"
+                                    Data="@summaryRecords"
+                                    Columns="@summaryRecordColumns"
+                                    AllowSorting="true" />
+            }
+        };
+    }
+    private async Task LoadAllAsync()
+    {
+        summary = await Http.GetFromJsonAsync<BalanceSummaryDto>("https://localhost:7045/api/balance/summary");
+        invalidRecords = await Http.GetFromJsonAsync<List<InvalidRecordDto>>("https://localhost:7045/api/balance/invalid-records") ?? new();
+        summaryRecords = await Http.GetFromJsonAsync<List<SummaryRecordDto>>("https://localhost:7045/api/balance/summary-records") ?? new();
+
+        if (summary != null)
+        {
+            balanceSummaryList = new List<BalanceSummaryRowDto>
+        {
+            new() { Label = "Beginning Balance", Value = summary.BeginningBalance },
+            new() { Label = "- Carryover from previous balance", Value = summary.CarryOverBal },
+            new() { Label = "+ Total CR/DR Posted", Value = summary.PostedBenefits },
+            new() { Label = "+ Total CR/DR from Adjustments", Value = summary.HiddenAdjustments },
+            new() { Label = "= Ending Balance", Value = summary.EndingBalance },
+            new() { Label = "+ Total CR/DR from Pre-Edit File", Value = summary.InvalidTotal },
+            new() { Label = "+ Total CR/DR from Deceased Patients", Value = summary.DeceasedTotal },
+            new() { Label = "= Adjusted Ending Balance", Value = summary.AdjustedEndingBalance },
+            new() { Label = "- FUNB Ledger Balance", Value = summary.LedgerBalance },
+            new() { Label = "= Difference", Value = summary.Difference }
+        };
+        }
+    }
+
+  
+
+
+
+    private async Task HandleTabChanged(int index)
+    {
+        activeTabIndex = index;
+
+        if (index == 1 || index == 2)
+            await LoadAllAsync();
+    }
+    private RenderFragment<int> RenderActionButtons => (tabIndex) => @<text>
+        @if (tabIndex == 0)
+        {
+            <RadzenButton Text="Finish"
+                          Click="@OnFinish"
+                          Style="width: 180px; background-color: #007BFF;" />
+        }
+    </text>;
+
+    private async Task OnFinish()
+    {
+        if (summary == null)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = "Summary data not loaded.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        // if (summary.Difference != 0)
+        // {
+        //     NotificationService.Notify(new NotificationMessage
+        //     {
+        //         Severity = NotificationSeverity.Warning,
+        //         Summary = "Balancing Blocked",
+        //         Detail = "Cannot complete balance because difference is not zero.",
+        //         Duration = 5000
+        //     });
+        //     return;
+        // }
+
+        var insertDto = new BalanceInsertDto
+        {
+            BeginningBalance = summary.BeginningBalance,
+            CarryOverBalance = summary.CarryOverBal,
+            TotalPosted = summary.PostedBenefits,
+            EndingBalance = summary.EndingBalance,
+            InvalidTotal = summary.InvalidTotal,
+            DeceasedTotal = summary.DeceasedTotal,
+            AdjustedEndingBalance = summary.AdjustedEndingBalance,
+            LedgerBalance = summary.LedgerBalance,
+            CreatedBy = "currentUser", // Replace with actual user context
+            Adjustments = summary.HiddenAdjustments
+        };
+
+        var response = await Http.PostAsJsonAsync("https://localhost:7045/api/balance/insert-balance", insertDto);
+
+        if (response.IsSuccessStatusCode)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Success",
+                Detail = "Balance process completed.",
+                Duration = 4000
+            });
+
+            await LoadAllAsync();
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = error,
+                Duration = 4000
+            });
+        }
+    }
+    private List<ColumnDefinition> balanceSummaryColumns = new()
+    {
+        new() { Property = "Label", Title = "Description", Width = "100px", Align = "left" },
+        new() { Property = "Value", Title = "Amount", Width = "100px", Align = "center", Format = "{0:C2}" }
+    };
+
+    private List<ColumnDefinition> invalidColumns = new()
+    {
+        new() { Property = "DD_NUM", Title = "DD Number", Width = "120px", Align = "center" },
+        new() { Property = "FUNB_INCOME_SRC_TYPE", Title = "FUNB Income Type", Width = "180px", Align = "center" },
+        new() { Property = "TOT_FUNB_BENEFIT_AMT", Title = "Amount", Width = "120px", Align = "right", Format = "{0:C}" },
+        new() { Property = "DR_CR_FLAG", Title = "Debit/Credit", Width = "80px", Align = "center" },
+        new() { Property = "DECEASED_IND", Title = "Deceased", Width = "100px", Align = "center" }
+    };
+
+    private List<ColumnDefinition> summaryRecordColumns = new()
+    {
+        new() { Property = "BAI_FILE_DATETIME", Title = "FUNB Date", Width = "140px", Align = "center", Format = "{0:yyyy-MM-dd}" },
+        new() { Property = "LEDGER_BAL", Title = "Ledger Balance", Width = "140px", Align = "right", Format = "{0:C}" },
+        new() { Property = "AVAILABLE_BAL", Title = "Available Balance", Width = "140px", Align = "right", Format = "{0:C}" },
+        new() { Property = "COLLECTED_BAL", Title = "Collected Balance", Width = "140px", Align = "right", Format = "{0:C}" },
+        new() { Property = "FUNB_TOTAL_CREDITS", Title = "FUNB Total Credits", Width = "140px", Align = "right", Format = "{0:C}" },
+        new() { Property = "FUNB_TOTAL_DEBITS", Title = "FUNB Total Debits", Width = "140px", Align = "right", Format = "{0:C}" },
+        new() { Property = "CREATED_DATETIME", Title = "Download Date", Width = "140px", Align = "center", Format = "{0:yyyy-MM-dd}" },
+        new() { Property = "CREATED_BY", Title = "Downloaded By", Width = "120px", Align = "center" }
+    };
+}

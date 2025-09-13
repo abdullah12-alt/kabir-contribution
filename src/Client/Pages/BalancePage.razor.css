@@ -1,0 +1,5 @@
+﻿.page-header {
+    margin-bottom: 19px;
+    display: flex;
+    justify-content: space-between;
+}

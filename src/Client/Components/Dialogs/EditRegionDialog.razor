@@ -1,0 +1,75 @@
+﻿@using Client.Models
+@using Client.Services
+@inject RegionService RegionService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<EditForm Model="@Region" OnValidSubmit="OnValidSubmit">
+    <RadzenTemplateForm TItem="RegionDto" Context="formContext">
+        <div class="rz-grid rz-form-layout rz-gap-3 rz-cols-1 md:rz-cols-2">
+            <div class="row">
+                <div class="half">
+                    <RadzenLabel Text="Region Name" Component="RegionBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="Region.Region" Name="Region" Placeholder="Region Name" Style="width:100%" id="RegionBox" />
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="half">
+                    <RadzenLabel Text="Email Recipients (To)" Component="ToBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="Region.EmailRecipientsTo" Name="EmailRecipientsTo" Placeholder="Enter To emails" Style="width:100%" id="ToBox" />
+                </div>
+                <div class="half">
+                    <RadzenLabel Text="Email Recipients (Cc)" Component="CcBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="Region.EmailRecipientsCc" Name="EmailRecipientsCc" Placeholder="Enter Cc emails" Style="width:100%" id="CcBox" />
+                </div>
+            </div>
+
+            <div class="rz-mt-4 rz-text-right">
+                <RadzenButton Text="Save" Click="@OnValidSubmit" ButtonStyle="Radzen.ButtonStyle.Secondary" ButtonType="Radzen.ButtonType.Submit" Style="margin-top: 16px;" />
+                <RadzenButton Text="Cancel" ButtonStyle="Radzen.ButtonStyle.Danger" Click="@(args => DialogService.Close(null))" Style="margin-top: 16px; margin-left: 8px;" />
+            </div>
+        </div>
+    </RadzenTemplateForm>
+</EditForm>
+
+@code {
+    [Parameter] public RegionDto Region { get; set; } = new();
+
+    private async Task OnValidSubmit()
+    {
+        bool success;
+
+        if (Region.RegionId == 0)
+        {
+            success = await RegionService.CreateAsync(Region);
+        }
+        else
+        {
+            success = await RegionService.UpdateAsync(Region);
+        }
+
+        if (success)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Saved",
+                    Detail = "Region saved successfully.",
+                    Duration = 5000
+                });
+
+            DialogService.Close(Region);
+        }
+        else
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Save Failed",
+                    Detail = "The server was unable to save the region.",
+                    Duration = 5000
+                });
+        }
+    }
+}

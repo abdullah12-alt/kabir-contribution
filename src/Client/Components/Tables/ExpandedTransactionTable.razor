@@ -1,0 +1,288 @@
+﻿@namespace Client.Components.StepProcess
+@using Client.Components.Dialogs
+@using Radzen
+@using Radzen.Blazor
+@using Client.Models
+@using Client.Services
+@inject DialogService DialogService
+@inject PreEditService PreEditService
+@inject NotificationService NotificationService
+@inject HttpClient Http
+
+<div style="padding: 20px;">
+    <div class="table-toolbar">
+        @* <div> *@
+        @*     <h2 class="transaction-heading">@selectedType</h2> *@
+        @* </div> *@
+        <div style="display: flex; gap: 10px; align-items: center;">
+            @* <label>Type:</label> *@
+            @* <RadzenDropDown @bind-Value="selectedType" *@
+            @* Data="@transactionTypes" *@
+            @* Change="OnTransactionTypeChanged" *@
+            @* Style="width: 200px;" /> *@
+
+            <label>Rows per page:</label>
+            <RadzenDropDown @bind-Value="pageSize"
+            Data="@pageSizeOptions"
+            Change="@(args => grid?.GoToPage(0))"
+            Style="width: 120px;" />
+        </div>
+    </div>
+
+
+        <RadzenDataGrid @ref="grid"
+        TItem="TransactionRecord"
+        Data="@transactions"
+        AllowPaging="true"
+        PageSize="@pageSize"
+        AllowSorting="true"
+        ColumnWidth="auto"
+        Responsive="true"
+        class="rz-datagrid">
+            <Columns>
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="DD_NUM" Title="DD #" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="INCOME_SOURCE_TYPE" Title="Income Source" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="AFFINITY_ACCT_NUM" Title="Account #" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="MRUN" Title="MRUN" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="BankDate" Title="BANK DATE" FormatString="{0:yyyy-MM-dd}" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="CREATED_DATETIME" Title="Created Date" FormatString="{0:yyyy-MM-dd}" />
+                @if (selectedType == "Invalid Transactions")
+                {
+                    <RadzenDataGridColumn TItem="TransactionRecord" Title="Actions" Width="120px">
+                        <Template Context="record">
+                       
+                            <RadzenButton Icon="edit"
+                                          Size="Radzen.ButtonSize.Small"
+                                          ButtonStyle="ButtonStyle.Primary"
+                                          Click="@(async () => await EditTransaction(record))"
+                                          Style="margin-right: 6px;" />
+                            <RadzenButton Icon="delete"
+                                          Size="Radzen.ButtonSize.Small"
+                                          ButtonStyle="ButtonStyle.Danger"
+                                          Click="@(async () => await DeleteTransactionAsync(record))" />
+                        
+                    </Template>
+                </RadzenDataGridColumn>
+                }
+
+            </Columns>
+        </RadzenDataGrid>
+</div>
+
+<style>
+    .table-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .transaction-heading {
+        font-size: 24px;
+        font-weight: 600;
+        color: black;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .rz-grid-table thead th .rz-column-title {
+        justify-content: center;
+    }
+
+    .rz-cell-data {
+        text-align: center;
+    }
+    /* Header font size */
+    .rz-datatable-header th,
+    .rz-grid-table thead th {
+        font-size: 16px !important;
+    }
+
+    /* Row content font size */
+    .rz-grid-table td,
+    .rz-cell-data {
+        font-size: 14px !important;
+    }
+
+    /* Smaller icon buttons for Actions column */
+    .row-actions .rz-button {
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+        min-width: auto !important;
+        height: 32px !important;
+    }
+
+        .row-actions .rz-button .rz-button-icon {
+            font-size: 12px !important;
+        }
+    /* All Radzen DataGrid header titles */
+    .rz-column-title {
+        font-size: 18px !important;
+    }
+</style>
+
+@code {
+    [Parameter] public List<TransactionRecord> transactions { get; set; } = new();
+    [Parameter] public int pageSize { get; set; } = 25;
+    [Parameter] public string? SelectedTypeFromParent { get; set; }
+
+    private RadzenDataGrid<TransactionRecord>? grid;
+    private List<int> pageSizeOptions = new() { 25, 50, 100 };
+    private List<string> transactionTypes = new() { "All Transactions", "Valid Transactions", "Invalid Transactions" };
+    private string selectedType = "All Transactions";
+
+    private bool isInitialLoad = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(SelectedTypeFromParent))
+        {
+            selectedType = SelectedTypeFromParent;
+        }
+
+        isInitialLoad = false;
+        await LoadTransactionsAsync();
+    }
+
+    private async Task OnTransactionTypeChanged(object value)
+    {
+        selectedType = value?.ToString() ?? "All Transactions";
+        await LoadTransactionsAsync();
+    }
+
+    private async Task LoadTransactionsAsync()
+    {
+        try
+        {
+            var context = await Http.GetFromJsonAsync<BaiFileContext>("https://localhost:7045/api/bank-files/current");
+            if (context == null || string.IsNullOrWhiteSpace(context.BaiFileId))
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Warning,
+                        Summary = "Missing BAI File",
+                        Detail = "No BAI file has been loaded. Please upload one before viewing transactions.",
+                        Duration = 4000
+                    });
+                transactions.Clear();
+                return;
+            }
+
+            string baiFileId = context.BaiFileId;
+            string endpoint = selectedType.ToLower().Trim() switch
+            {
+                "valid transactions" => $"api/transactions/valid?baiFileId={baiFileId}",
+                "invalid transactions" => $"api/transactions/invalid?baiFileId={baiFileId}",
+                _ => $"api/transactions/all?baiFileId={baiFileId}"
+            };
+
+            var apiResponse = await Http.GetFromJsonAsync<List<WorkTransactionDto>>($"https://localhost:7045/{endpoint}");
+
+            transactions = apiResponse?.Select(x => new TransactionRecord
+                {
+                    DD_NUM = x.DD_NUM,
+                    INCOME_SOURCE_TYPE = string.IsNullOrWhiteSpace(x.FUNB_INCOME_SRC_TYPE) ? "N/A" : x.FUNB_INCOME_SRC_TYPE,
+                    AFFINITY_ACCT_NUM = string.IsNullOrWhiteSpace(x.AFFINITY_ACCT_NUM) ? "N/A" : x.AFFINITY_ACCT_NUM,
+                    BankDate = x.AS_OF_DATETIME ?? DateTime.MinValue,
+                    Institution = x.INSTITUTION_CODE,
+                    MRUN = string.IsNullOrWhiteSpace(x.MEDICAL_RECORD_NUM) ? "N/A" : x.MEDICAL_RECORD_NUM,
+                    CREATED_DATETIME = x.CREATED_DATETIME,
+                    BAI_FILE_ID = x.BAI_FILE_ID,
+                    INVALID_RECORD_ID = x.INVALID_RECORD_ID
+                }).ToList() ?? new List<TransactionRecord>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching transactions: {ex.Message}");
+        }
+    }
+
+    private async Task EditTransaction(TransactionRecord record)
+    {
+        var result = await DialogService.OpenAsync<EditTransactionDialog>(
+            "Edit Transaction",
+            new Dictionary<string, object> { ["Transaction"] = record },
+            new DialogOptions { Width = "600px", Height = "500px", Resizable = true });
+
+        if (result is TransactionRecord updated)
+        {
+            var dto = new InvalidRecordDto
+                {
+                    INVALID_RECORD_ID = updated.INVALID_RECORD_ID ?? 0,
+                    DD_NUM = updated.DD_NUM,
+                    MEDICAL_RECORD_NUM = updated.MRUN,
+                    AFFINITY_ACCT_NUM = updated.AFFINITY_ACCT_NUM,
+                    FUNB_INCOME_SRC_TYPE = updated.INCOME_SOURCE_TYPE,
+                    AS_OF_DATETIME = updated.AS_OF_DATETIME ?? updated.BankDate,
+                    CREATED_DATETIME = updated.CREATED_DATETIME ?? DateTime.Now
+                };
+
+            bool success = await PreEditService.SavePreEditAsync(dto);
+
+            if (success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Updated",
+                        Detail = $"Transaction DD #{updated.DD_NUM} updated successfully.",
+                        Duration = 3000
+                    });
+
+                var index = transactions.FindIndex(t => t.INVALID_RECORD_ID == updated.INVALID_RECORD_ID);
+                if (index >= 0) transactions[index] = updated;
+
+                await grid.Reload();
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Failed",
+                        Detail = $"Could not update DD #{updated.DD_NUM}.",
+                        Duration = 4000
+                    });
+            }
+        }
+    }
+
+    private async Task DeleteTransactionAsync(TransactionRecord record)
+    {
+        bool? confirmed = await DialogService.Confirm(
+            $"Are you sure you want to delete DD #{record.DD_NUM}?",
+            "Confirm Delete");
+
+        if (confirmed == true)
+        {
+            bool success = await PreEditService.DeletePreEditAsync(record.INVALID_RECORD_ID);
+            if (success)
+            {
+                transactions.Remove(record);
+                await grid.Reload();
+
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Deleted",
+                        Detail = $"DD #{record.DD_NUM} was successfully deleted.",
+                        Duration = 3000
+                    });
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Error",
+                        Detail = $"Failed to delete DD #{record.DD_NUM}.",
+                        Duration = 4000
+                    });
+            }
+        }
+    }
+}
+

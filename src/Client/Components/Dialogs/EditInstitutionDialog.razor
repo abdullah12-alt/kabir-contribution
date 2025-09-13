@@ -1,0 +1,73 @@
+﻿@using Client.Models
+@using Client.Services
+@inject InstitutionService InstitutionService
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+<EditForm Model="@Institution" OnValidSubmit="OnValidSubmit">
+    <RadzenTemplateForm TItem="Institution" Context="formContext" >
+        <div class="rz-grid rz-form-layout rz-gap-3 rz-cols-1 md:rz-cols-2">
+            <div class="row">
+                <div class="half">
+                    <RadzenLabel Text="Institution Code" Component="InstitutionCodeBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="Institution.INSTITUTION_CODE" Name="Institution Code" Placeholder="Institution Code" Style="width:100%" id="InstitutionCodeBox" />
+                </div>
+                <div class="half">
+                    <RadzenLabel Text="Institution Name" Component="InstitutionNameBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="Institution.INSTITUTION_NAME" Name="Institution Name" Placeholder="Institution Name" Style="width:100%" id="InstitutionNameBox" />
+                </div>
+            </div>
+            <div class="row">
+                <div class="half">
+          
+          <RadzenLabel Text="Vendor ID" Component="VendorIdBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="Institution.DD_VENDOR_ID_NUM" Name="Vendor ID" Placeholder="Vendor ID" Style="width:100%" id="VendorIdBox" />
+                </div>
+                <div class="half">
+                    <RadzenLabel Text="Affinity DB Name" Component="AffinityDbBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="Institution.AFFINITY_DB_NAME" Name="Affinity DB Name" Placeholder="Affinity DB Name" Style="width:100%" id="AffinityDbBox" />
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="half">
+                    <RadzenLabel Text="Send Report To" Component="ReportToBox" Style="display:block; margin-bottom:4px;" />
+                    <RadzenTextBox @bind-Value="Institution.DD_SEND_REPORT_TO" Name="Send Report To" Placeholder="Send Report To" Style="width:100%" id="ReportToBox" />
+                </div>
+            </div>
+            <RadzenButton Text="Save" Click="@OnValidSubmit" ButtonStyle="Radzen.ButtonStyle.Secondary" ButtonType="Radzen.ButtonType.Submit" Style="margin-top: 16px;" />
+        <RadzenButton Text="Cancel" ButtonStyle="Radzen.ButtonStyle.Danger" Click="@(args => DialogService.Close(null))" Style="margin-top: 16px; margin-left: 8px;" />
+         </div>
+    </RadzenTemplateForm>
+</EditForm>
+
+@code {
+    [Parameter] public Institution Institution { get; set; } = new();
+
+    private async Task OnValidSubmit()
+    {
+        bool success = await InstitutionService.CreateOrUpdateAsync(Institution, 
+            Institution.INSTITUTION_ID == 0 ? "I" : "U", "1");
+        if (success)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Saved",
+                Detail = "Institution saved successfully.",
+                Duration = 4000
+            });
+            DialogService.Close(Institution);
+        }
+        else
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Save Failed",
+                Detail = "The server was unable to save the record.",
+                Duration = 4000
+            });
+        }
+    }
+}

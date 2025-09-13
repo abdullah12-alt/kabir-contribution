@@ -1,0 +1,202 @@
+﻿@page "/settings/income-source"
+@using Client.Components.Dialogs
+@using Client.Library
+@using Client.Models
+@using Client.Services
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject IncomeSourceTypeService IncomeSourceTypeService
+
+
+<h3>Income Sources</h3>
+<div class="container">
+    <div style="display: flex;justify-content:end">
+
+        <RadzenButton Text="Add New" Icon="add"
+                      Click="@OnAdd" Style="background-color: #007BFF; color: white;margin-bottom: 16px;" />
+    </div>
+
+    <DdsTable TItem="IncomeSourceType"
+                  Data="@incomeSourceTypes"
+                  Columns="@incomeSourceColumns"
+                  PageSize="@pageSize"
+                  AllowSorting="true"
+                  RowButtons="@ActionButtons" />
+
+    <RadzenNotification />
+
+</div>
+
+<style>
+    /* Header font size */
+    .rz-datatable-header th,
+    .rz-grid-table thead th {
+        font-size: 18px !important;
+
+    }
+
+        .rz-grid-table thead th .rz-column-title-content {
+            text-transform: none; /* disables uppercase */
+            padding: 4px;
+        }
+    h3{
+        margin-bottom: -0.9rem;
+    }
+    .container{
+        margin-left: 0px;
+        padding-left:0px;
+    }
+
+    /* Row content font size
+    .rz-grid-table td,
+    .rz-cell-data {
+        font-size: 16px !important;
+    }
+
+    /* Smaller icon buttons for Actions column */
+    .row-actions .rz-button {
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+        min-width: auto !important;
+        height: 32px !important;
+    }
+
+     .row-actions .rz-button .rz-button-icon {
+            font-size: 12px !important;
+     }
+    /* All Radzen DataGrid header titles */
+    .rz-column-title {
+        font-size: 20px !important;
+        text-align:center;
+     } 
+
+    /* .rz-pager { */
+    /*     justify-content: center !important; */
+    /* } */
+
+    .rz-grid-table thead th .rz-column-title { 
+        justify-content: center;
+    }
+
+    /* .rz-cell-data {
+    /*     text-align: center; */
+    /* } */
+
+  
+
+    .rz-datagrid {
+        font-size: 0.95rem;
+    }
+    .row-actions {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+    }
+
+
+
+</style>
+
+@code {
+    [Parameter] public int pageSize { get; set; } = 25;
+
+    private List<IncomeSourceType> incomeSourceTypes = new();
+    private RadzenDataGrid<IncomeSourceType>? grid;
+    private List<ColumnDefinition> incomeSourceColumns = new()
+{
+    new() { Property = "FUNB_INCOME_SRC_TYPE", Title = "FUNB Code", Width = "280px", Align = "center" },
+    new() { Property = "INCOME_SRC_TYPE_DESCR", Title = "Description", Width = "580px" }
+};
+    private List<RowButtonDefinition<IncomeSourceType>> ActionButtons => new()
+{
+    new()
+    {
+        Icon = "edit",
+        Tooltip = "Edit Income Source",
+        BackgroundColor = ButtonColors.Info,
+        Callback = async item => await OnEdit(item)
+    },
+    new()
+    {
+        Icon = "delete",
+        Tooltip = "Delete Income Source",
+        BackgroundColor = ButtonColors.Danger,
+        Callback = async item => await OnDelete(item)
+    }
+};
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadIncomeSourceTypesAsync();
+    }
+
+    private async Task LoadIncomeSourceTypesAsync()
+    {
+        incomeSourceTypes = await IncomeSourceTypeService.GetAllAsync();
+    }
+
+    private async Task OnAdd()
+    {
+        var result = await DialogService.OpenAsync<EditIncomeSourceTypeDialog>(
+            "Add Income Source Type",
+            new Dictionary<string, object> { ["IncomeSourceType"] = new IncomeSourceType() },
+            new DialogOptions()
+                {
+                    Width = "600px",
+                    Height = "500px",
+                    Resizable = true  ,
+                    CssClass = "dialog-scroll-fix"  
+                });
+
+        if (result is IncomeSourceType)
+            await LoadIncomeSourceTypesAsync();
+    }
+
+    private async Task OnEdit(IncomeSourceType record)
+    {
+        var result = await DialogService.OpenAsync<EditIncomeSourceTypeDialog>(
+            "Edit Income Source Type",
+            new Dictionary<string, object> { ["IncomeSourceType"] = record },
+
+            new DialogOptions() { Width = "600px", Height = "500px", Resizable = true,
+                    CssClass = "dialog-scroll-fix"  // This is the key
+                });
+
+        if (result is IncomeSourceType)
+            await LoadIncomeSourceTypesAsync();
+    }
+
+    private async Task OnDelete(IncomeSourceType record)
+    {
+        bool? confirmed = await DialogService.Confirm(
+            $"Are you sure you want to delete {record.FUNB_INCOME_SRC_TYPE}?",
+            "Delete Confirmation");
+
+        if (confirmed == true)
+        {
+            bool success = await IncomeSourceTypeService.DeleteAsync(record.INCOME_SOURCE_TYPE_ID, "1");
+            if (success)
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Success,
+                        Summary = "Deleted",
+                        Detail = $"{record.FUNB_INCOME_SRC_TYPE} has been deleted.",
+                        Duration = 4000
+                    });
+                await LoadIncomeSourceTypesAsync();
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Delete Failed",
+                        Detail = "The server was unable to delete the record.",
+                        Duration = 4000
+                    });
+            }
+        }
+    }
+}

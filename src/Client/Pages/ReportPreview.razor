@@ -1,0 +1,161 @@
+﻿@page "/reports"
+@using Client.Components.Dialogs
+@using Client.Library
+@using Client.Models
+@using Client.Services
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject INewTabService NewTabService
+@inject NotificationService NotificationService
+
+<h3>Reports</h3>
+
+<div class="container">
+    <DdsTable TItem="ReportDefinition"
+              Data="@reports"
+              Columns="@reportColumns"
+              PageSize="10"
+              AllowSorting="false"
+              RowButtons="@ReportActionButtons" />
+
+    <RadzenNotification />
+</div>
+<style>
+    .rz-datatable-header th,
+    .rz-grid-table thead th {
+        font-size: 18px !important;
+    }
+
+    .rz-grid-table thead th .rz-column-title-content {
+        text-transform: none;
+        padding: 4px;
+     }
+
+    h3 {
+        margin-bottom: 32px;
+    }
+
+    .container {
+        margin-left: 0px;
+        padding-left: 0px;
+    }
+
+    .row-actions .rz-button {
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+        min-width: auto !important;
+        height: 32px !important;
+    }
+
+        .row-actions .rz-button .rz-button-icon {
+            font-size: 12px !important;
+        }
+    .rz-column-title {
+        font-size: 20px !important;
+        text-align: center;
+    }
+
+
+
+    .rz-grid-table thead th .rz-column-title {
+        justify-content: center;
+    }
+
+
+    .rz-datagrid {
+        font-size: 0.95rem;
+    }
+
+    .row-actions {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+    }
+
+</style>
+
+@code {
+    private List<ReportDefinition> reports = new()
+    {
+        new ReportDefinition
+        {
+            Title = "Pre-Edit Report",
+            Description = "This report identifies accounts that did not pass the validation process. Report reflects cumulative records to date that have not been resolved. This report is sorted by FUNB 'as of' date.",
+            ReportUrl = "http://desktop-pqbt7k3/ReportServer/Pages/ReportViewer.aspx?/SSRS/PreEdit&rs:Command=Render"
+        },
+        new ReportDefinition
+        {
+            Title = "Deceased Exception Report",
+            Description = "This report identifies accounts that are discharged due to death. Report reflects cumulative records to date that have not been resolved. This report is sorted by institution, by income source, by FUNB 'as of' date, and then by wage earner claim number.",
+            ReportUrl = "http://desktop-pqbt7k3/ReportServer/Pages/ReportViewer.aspx?/SSRS/DeceasedRpt&rs:Command=Render"
+        },
+        new ReportDefinition
+        {
+            Title = "Automated Balancing Worksheet Report",
+            Description = "This report provides the Central Billing Office with information for a point in time that documents that all areas are in balance, or information documenting that all areas are NOT in balance so that the appropriate follow-up can occur.",
+            ReportUrl = "http://desktop-pqbt7k3/ReportServer/Pages/ReportViewer.aspx?%2fSSRS%2fBalWkSht&rs:Command=Render"
+        },
+        new ReportDefinition
+        {
+            Title = "Direct Deposit Details and Summary Report",
+            Description = "This report identifies those accounts that resulted in an actual posting to the personal fund and/or patient account on the date selected. This report is sorted by institution, ATP or PML, income source, client name, and FUNB 'as of' date.",
+            ReportUrl = "http://desktop-pqbt7k3/ReportServer/Pages/ReportViewer.aspx?%2fSSRS%2fDDDetSum&rs:Command=Render"
+        }
+        ,
+        new ReportDefinition
+        {
+            Title = "Valid Records",
+            Description = "This report is generated after the validation process is complete.",
+            ReportUrl = "http://desktop-pqbt7k3/ReportServer/Pages/ReportViewer.aspx?%2fSSRS%2fValidRecords&rs:Command=Render"
+        },
+        new ReportDefinition
+        {
+            Title = "Patient Account File to Treasurer Report",
+            Description = "This report is generated after the Sending Records to treasurer.",
+            ReportUrl = "http://desktop-pqbt7k3/ReportServer/Pages/ReportViewer.aspx?%2fSSRS%2fPATreasurer&rs:Command=Render"
+        }
+        ,
+        new ReportDefinition
+        {
+            Title = "Personal Funds File to Treasurer Report",
+            Description = "This report is generated after the Sending Records to treasurer.",
+            ReportUrl = "http://desktop-pqbt7k3/ReportServer/Pages/ReportViewer.aspx?%2fSSRS%2fPFTreasurer&rs:Command=Render"
+        }
+    };
+
+    private List<ColumnDefinition> reportColumns = new()
+    {
+        new() { Property = "Title", Title = "Report Title", Width = "300px" },
+        new() { Property = "Description", Title = "Description", Width = "600px", MaxCharLength = 200 }
+
+    };
+
+    private List<RowButtonDefinition<ReportDefinition>> ReportActionButtons => new()
+    {
+        new()
+        {
+            Icon = "open_in_new",
+            Tooltip = "Preview Report",
+            BackgroundColor = ButtonColors.Primary,
+            Callback = async item => await PreviewReport(item)
+        }
+    };
+
+    private async Task PreviewReport(ReportDefinition report)
+    {
+        try
+        {
+            await NewTabService.OpenUrlInNewTab(report.ReportUrl);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Failed to Preview",
+                Detail = ex.Message,
+                Duration = 5000
+            });
+        }
+    }
+}

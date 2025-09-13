@@ -1,0 +1,324 @@
+﻿@page "/post-transactions"
+@using Client.Services
+@inject HttpClient Http
+@inject NotificationService NotificationService
+
+<h3>Post Transactions</h3>
+@if (isLoading)
+{
+    <div class="loader-overlay">
+        <div class="spinner"></div>
+        <div class="loader-text">Validating transactions...</div>
+    </div>
+}
+
+
+@if (showValidTransactions)
+{
+    <div class="transaction-container">
+        <RadzenDataGrid TItem="TransactionRecord" Data="@validTransactions"
+        AllowPaging="true" PageSize="15" AllowSorting="true" ColumnWidth="auto"
+        class="rz-datagrid centered-grid">
+            <Columns>
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="DD_NUM" Title="DD #" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="PatientName" Title="Name" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="INCOME_SOURCE_TYPE" Title="Income Source" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="AFFINITY_ACCT_NUM" Title="Account #" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="MRUN" Title="MRUN" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="DECEASED" Title="Deceased" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="INSTITUTION_CODE_3" Title="Institution" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="BankDate" Title="FUNB As of" FormatString="{0:yyyy-MM-dd}" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="PFAmount" Title="FUNB Amount" Width="200px" />
+                <RadzenDataGridColumn TItem="TransactionRecord" Property="CREATED_DATETIME" Title="Created Date" FormatString="{0:yyyy-MM-dd}" Width="200px" />
+            </Columns>
+        </RadzenDataGrid>
+        <div class="record-count-info">
+            Total: @validTransactions.Count record@(validTransactions.Count == 1 ? "" : "s")
+        </div>
+    </div>
+}
+else if (summaryData.Any())
+{
+    <RadzenDataGrid TItem="SummaryItem" Data="@summaryData"
+    AllowSorting="false"
+    Style="max-width: 600px; margin: 20px auto;">
+        <Columns>
+            <RadzenDataGridColumn TItem="SummaryItem" Property="EntityName" Title="Entity Name" />
+            <RadzenDataGridColumn TItem="SummaryItem" Property="Count" Title="Count" />
+        </Columns>
+    </RadzenDataGrid>
+}
+else if (showPostedHistory)
+{
+    <RadzenDataGrid TItem="PostingAck" Data="@postingHistory"
+    AllowPaging="true" PageSize="25" AllowSorting="true"
+    class="rz-datagrid centered-grid">
+        <Columns>
+            <RadzenDataGridColumn TItem="PostingAck" Property="POSTING_ACK_ID" Title="Ack ID" />
+            <RadzenDataGridColumn TItem="PostingAck" Property="INVALID_RECORD_ID" Title="Invalid Record ID" />
+            <RadzenDataGridColumn TItem="PostingAck" Property="CREATED_DATETIME" Title="Created Date" FormatString="{0:yyyy-MM-dd HH:mm}" />
+            <RadzenDataGridColumn TItem="PostingAck" Property="MSG_CONTROL_ID" Title="Msg Control ID" />
+            <RadzenDataGridColumn TItem="PostingAck" Property="PA_POSTING_STATUS" Title="PA Status" />
+            <RadzenDataGridColumn TItem="PostingAck" Property="PF_POSTING_STATUS" Title="PF Status" />
+            <RadzenDataGridColumn TItem="PostingAck" Property="PA_ERR_CODE" Title="PA Err Code" />
+            <RadzenDataGridColumn TItem="PostingAck" Property="PF_ERR_CODE" Title="PF Err Code" />
+        </Columns>
+    </RadzenDataGrid>
+    <div class="record-count-info">
+        Total: @postingHistory.Count record@(postingHistory.Count == 1 ? "" : "s")
+    </div>
+}
+
+else
+{
+    <p><em>Loading or no data available...</em></p>
+}
+
+
+<RadzenNotification />
+
+<div class="row justify-content-center mt-3 gap-2">
+    @if (showValidTransactions)
+    {
+        <RadzenButton Style="width: 112px; background-color: #007BFF;"
+        Text="Post"
+        Click="@OnPost"
+        Disabled="@isPosting" />
+    }
+    else
+    {
+        <RadzenButton Style="width: 112px;"
+        ButtonStyle="ButtonStyle.Secondary"
+        Text="Posted History"
+        Click="@LoadPostingHistoryAsync" />
+
+    }
+
+  
+
+    <RadzenButton Variant="Variant.Outlined" Style="width: 112px;" Text="Cancel" ButtonStyle="ButtonStyle.Danger" />
+</div>
+
+<style>
+    h3{
+    margin-bottom: 32px;
+    }
+    .rz-grid-table thead th .rz-column-title {
+    justify-content: center;
+    }
+
+    .rz-datatable-data td .rz-cell-data, .rz-grid-table td .rz-cell-data {
+    text-align: left;
+    }
+    /* Header font size */
+    .rz-datatable-header th,
+    .rz-grid-table thead th {
+    font-size: 16px !important;
+    }
+
+    /* Row content font size */
+    .rz-grid-table td,
+    .rz-cell-data {
+    font-size: 14px !important;
+    }
+
+    /* Smaller icon buttons for Actions column */
+    .row-actions .rz-button {
+    font-size: 0.75rem !important;
+    padding: 4px 8px !important;
+    min-width: auto !important;
+    height: 32px !important;
+    }
+
+    .row-actions .rz-button .rz-button-icon {
+    font-size: 12px !important;
+    }
+    /* All Radzen DataGrid header titles */
+    .rz-column-title {
+    font-size: 16px !important;
+    }
+
+    .rz-grid-table td, .rz-cell-data {
+    text-align: left;
+    }
+
+    .scrollable-grid {
+    overflow-x: auto; /* Enables horizontal scroll */
+    overflow-y: auto; /* Keeps vertical scroll */
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    max-width: 100%; /* Ensures it doesn't overflow its parent */
+    padding-bottom: 10px; /* Prevents bottom scrollbar from clipping content */
+    }
+</style>
+
+@code {
+    private bool showValidTransactions = true;
+    private bool isPosting = false;
+    private bool isLoading = false;
+    private List<PostingAck> postingHistory = new();
+    private bool showPostedHistory = false;
+
+
+    private List<TransactionRecord> validTransactions = new();
+    private List<SummaryItem> summaryData = new();
+    private ExtendedPostCounts? counts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadvalidTransactionsAsync();
+    }
+
+    private async Task LoadvalidTransactionsAsync()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+            var validTransactionApi = await Http.GetFromJsonAsync<List<WorkTransactionDto>>($"https://localhost:7045/api/transactions/valid?baiFileId");
+            validTransactions = validTransactionApi?.Select(ToTransactionRecord).ToList() ?? new();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Load Failed",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPostingHistoryAsync()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            postingHistory = await Http.GetFromJsonAsync<List<PostingAck>>("https://localhost:7045/api/PostDeposits/ack-history")
+                              ?? new List<PostingAck>();
+
+            showValidTransactions = false;
+            showPostedHistory = true;
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Failed to load history",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+
+    private async Task OnPost()
+    {
+        isPosting = true;
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+
+            var response = await Http.PostAsync("https://localhost:7045/api/PostDeposits/post", null);
+            if (response.IsSuccessStatusCode)
+            {
+                counts = await Http.GetFromJsonAsync<ExtendedPostCounts>("https://localhost:7045/api/PostDeposits/counts");
+                summaryData = new List<SummaryItem>
+                {
+                    new SummaryItem { EntityName = "Total Records", Count = counts!.TotalRecords },
+                    new SummaryItem { EntityName = "Total PA Trans", Count = counts.TotalPATrans },
+                    new SummaryItem { EntityName = "Total PF Trans", Count = counts.TotalPFTrans },
+                    new SummaryItem { EntityName = "PA Trans Sent", Count = counts.PATransSent },
+                    new SummaryItem { EntityName = "PA Trans Ack", Count = counts.PATransAck },
+                    new SummaryItem { EntityName = "PF Trans Posted", Count = counts.PFTransPosted },
+                    new SummaryItem { EntityName = "PA Posting Error", Count = counts.PAPostingError },
+                    new SummaryItem { EntityName = "PF Posting Error", Count = counts.PFPostingError }
+                };
+
+                showValidTransactions = false;
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                NotificationService.Notify(new NotificationMessage
+                    {
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Post Failed",
+                        Detail = error,
+                        Duration = 5000
+                    });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Post Error",
+                    Detail = ex.Message,
+                    Duration = 5000
+                });
+        }
+        finally
+        {
+            isPosting = false;
+                isLoading = false;
+                StateHasChanged();
+            
+        }
+    }
+
+    private TransactionRecord ToTransactionRecord(WorkTransactionDto x) => new()
+        {
+            DD_NUM = x.DD_NUM,
+            INCOME_SOURCE_TYPE = string.IsNullOrWhiteSpace(x.FUNB_INCOME_SRC_TYPE) ? "" : x.FUNB_INCOME_SRC_TYPE,
+            AFFINITY_ACCT_NUM = string.IsNullOrWhiteSpace(x.AFFINITY_ACCT_NUM) ? "" : x.AFFINITY_ACCT_NUM,
+            BankDate = x.AS_OF_DATETIME ?? DateTime.MinValue,
+            Institution = string.IsNullOrWhiteSpace(x.INSTITUTION_CODE) ? "" : x.INSTITUTION_CODE,
+            MRUN = string.IsNullOrWhiteSpace(x.MEDICAL_RECORD_NUM) ? "" : x.MEDICAL_RECORD_NUM,
+            CREATED_DATETIME = x.CREATED_DATETIME,
+            BAI_FILE_ID = x.BAI_FILE_ID,
+            INVALID_RECORD_ID = x.INVALID_RECORD_ID,
+            INVALID_REC_ERR_MSG = x.INVALID_REC_ERR_MSG,
+            PatientName = string.IsNullOrWhiteSpace(x.PATIENT_NAME) ? "" : x.PATIENT_NAME,
+            DECEASED = string.IsNullOrWhiteSpace(x.DECEASED_IND) ? "" : x.DECEASED_IND,
+            PFAmount = x.PFAmount == null ? 0 : x.PFAmount,
+            MEMO = string.IsNullOrWhiteSpace(x.MEMO) ? "" : x.MEMO,
+            INCOMPLETE_POSTING_ERR_IND = string.IsNullOrWhiteSpace(x.INCOMPLETE_POSTING_ERR_IND) ? "" : x.INCOMPLETE_POSTING_ERR_IND,
+            INSTITUTION_CODE_3 = string.IsNullOrWhiteSpace(x.INSTITUTION_CODE_3) ? "" : x.INSTITUTION_CODE_3
+        };
+
+    public class ExtendedPostCounts
+    {
+        public int TotalRecords { get; set; }
+        public int TotalPATrans { get; set; }
+        public int TotalPFTrans { get; set; }
+        public int PATransSent { get; set; }
+        public int PATransAck { get; set; }
+        public int PFTransPosted { get; set; }
+        public int PAPostingError { get; set; }
+        public int PFPostingError { get; set; }
+    }
+
+    public class SummaryItem
+    {
+        public string EntityName { get; set; } = string.Empty;
+        public int Count { get; set; }
+    }
+}

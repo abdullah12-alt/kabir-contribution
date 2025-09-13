@@ -1,0 +1,45 @@
+@page "/Login"
+@using Client.Services
+@layout EmptyLayout
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@inject AuthenticationService AuthService
+
+<RadzenRow Gap="0" class="rz-my-12 rz-mx-auto rz-border-radius-6 rz-shadow-10" Style="width: 100%; max-width: 800px; overflow: hidden;">
+    <RadzenColumn Size="12" SizeMD="6">
+        <RadzenCard class="rz-shadow-0 rz-border-radius-0 rz-text-align-center rz-p-12" Style="height: 100%; background: var(--rz-secondary-light) no-repeat 100% 70% fixed url('data:image/svg+xml;base64,...')">
+            <RadzenText TextStyle="TextStyle.DisplayH3" TagName="TagName.H3" class="rz-color-white rz-mb-6">Welcome!</RadzenText>
+            <RadzenText TextStyle="TextStyle.H4" class="rz-color-white">Direct Deposit System</RadzenText>
+        </RadzenCard>
+    </RadzenColumn>
+    <RadzenColumn Size="12" SizeMD="6">
+        <RadzenCard class="rz-shadow-0 rz-border-radius-0 rz-p-12">
+            <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H2" class="rz-mb-6">
+                Login
+            </RadzenText>
+
+            <RadzenLogin AllowRegister="false" AllowResetPassword="false" Login="@OnLogin" />
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+@code {
+    private LoginRequest loginRequest = new LoginRequest();
+
+    private async void OnLogin(LoginArgs args)
+    {
+        loginRequest.UserId = args.Username;
+        loginRequest.Password = args.Password;
+
+        Console.WriteLine($"Captured UserId: {loginRequest.UserId}");
+        Console.WriteLine($"Captured Password: {loginRequest.Password}");
+
+        bool isSuccess = await AuthService.LoginAsync(loginRequest);
+        if (isSuccess)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+   
+}

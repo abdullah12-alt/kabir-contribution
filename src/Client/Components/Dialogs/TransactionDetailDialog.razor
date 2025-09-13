@@ -1,0 +1,33 @@
+﻿@using Client.Models
+@inherits RadzenComponent
+@code {
+    [Parameter] public TransactionRecord? Transaction { get; set; }
+}
+<div class="left-dialog-wrapper">
+<div style="padding: 1rem;">
+    <RadzenFieldset>
+        <p><b>DD #:</b> @Transaction?.DD_NUM</p>
+        <p><b>Memo:</b> @Transaction?.MEMO</p>
+        <p><b>Income Source:</b> @Transaction?.INCOME_SOURCE_TYPE</p>
+        <p><b>Name:</b> @Transaction?.PatientName</p>
+        <p><b>Account #:</b> @Transaction?.AFFINITY_ACCT_NUM</p>
+        <p><b>MRUN:</b> @Transaction?.MRUN</p>
+        <p><b>Deceased:</b> @Transaction?.DECEASED</p>
+        <p><b>Institution:</b> @Transaction?.Institution</p>
+        <p><b>FUNB As of:</b> @Transaction?.BankDate?.ToString("yyyy-MM-dd")</p>
+        <p><b>FUNB Amount:</b> @Transaction?.PFAmount</p>
+        <p><b>Created:</b> @Transaction?.CREATED_DATETIME?.ToString("yyyy-MM-dd")</p>
+        <p><b>Posting Error:</b> @Transaction?.INCOMPLETE_POSTING_ERR_IND</p>
+        <p><b>Error Message:</b> @Transaction?.INVALID_REC_ERR_MSG</p>
+    </RadzenFieldset>
+</div>
+</div>
+<style>
+    .left-dialog-wrapper {
+        margin: 0 auto 0 0; 
+        width: 100%;
+        max-width: 450px;
+        padding: 1rem;
+    }
+
+</style>

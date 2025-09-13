@@ -1,0 +1,114 @@
+﻿@using Client.Library
+@using Client.Models
+@typeparam TItem
+
+<RadzenDataGrid TItem="TItem"
+                Data="@Data"
+                AllowPaging="@AllowPaging"
+                AllowSorting="@AllowSorting"
+                PageSize="@PageSize"
+                ColumnWidth="@ColumnWidth"
+                RowSelect="@RowSelect"
+                class="rz-datagrid centered-grid"
+                PagerHorizontalAlign="Radzen.HorizontalAlign.Center">
+
+    <Columns>
+        @if (Columns != null)
+        {
+            @foreach (var col in Columns)
+            {
+                if (col.MaxCharLength.HasValue)
+                {
+                    <RadzenDataGridColumn TItem="TItem"
+                                          Title="@col.Title"
+                                          Width="@col.Width"
+                                          TextAlign="@GetTextAlign(col.Align)">
+                        <Template Context="record">
+                            @{
+                                var value = GetPropertyValue(record, col.Property)?.ToString() ?? string.Empty;
+                                var isTruncated = value.Length > col.MaxCharLength;
+                                var displayText = isTruncated ? value.Substring(0, col.MaxCharLength.Value) + "..." : value;
+                            }
+                            @if (isTruncated)
+                            {
+                                <span title="@value">@displayText</span>
+                            }
+                            else
+                            {
+                                <span>@displayText</span>
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+                }
+                else
+                {
+                    <RadzenDataGridColumn TItem="TItem"
+                                          Property="@col.Property"
+                                          Title="@col.Title"
+                                          Width="@col.Width"
+                                          TextAlign="@GetTextAlign(col.Align)"
+                                          FormatString="@col.Format" />
+                }
+            }
+
+
+        }
+
+        @if (RowButtons?.Any() == true)
+        {
+            <RadzenDataGridColumn TItem="TItem" Title="Actions" Width="180px">
+                <Template Context="record">
+                    <div class="row-actions">
+                        @foreach (var button in RowButtons)
+                        {
+                            <RadzenButton Icon="@button.Icon"
+                             Text="@button.Label"
+                             Title="@button.Tooltip"
+                                          Style="@GetButtonStyle(button)"
+                                          Click="@(() => button.Callback?.Invoke(record))" />
+
+                        }
+                    </div>
+                </Template>
+            </RadzenDataGridColumn>
+        }
+
+    </Columns>
+</RadzenDataGrid>
+<style>
+    .rz-datatable-data td .rz-cell-data, .rz-grid-table td .rz-cell-data{
+        white-space:normal !important;
+    }
+</style>
+@code {
+    [Parameter] public IEnumerable<TItem>? Data { get; set; }
+    [Parameter] public List<ColumnDefinition>? Columns { get; set; }
+    [Parameter] public List<RowButtonDefinition<TItem>>? RowButtons { get; set; }
+
+    [Parameter] public bool AllowPaging { get; set; } = true;
+    [Parameter] public bool AllowSorting { get; set; } = true;
+    [Parameter] public int PageSize { get; set; } = 12;
+    [Parameter] public string? ColumnWidth { get; set; } = "auto";
+    [Parameter] public EventCallback<TItem> RowSelect { get; set; }
+
+    private object? GetPropertyValue(object obj, string propertyName)
+    {
+        return obj?.GetType().GetProperty(propertyName)?.GetValue(obj);
+    }
+
+    private Radzen.TextAlign GetTextAlign(string? align) =>
+        align?.ToLower() switch
+        {
+            "center" => Radzen.TextAlign.Center,
+            "right" => Radzen.TextAlign.Right,
+            _ => Radzen.TextAlign.Left
+        };
+    private string GetButtonStyle(RowButtonDefinition<TItem> button)
+    {
+        var bg = string.IsNullOrWhiteSpace(button.BackgroundColor) ? "#007BFF" : button.BackgroundColor;
+        var fg = string.IsNullOrWhiteSpace(button.TextColor) ? "#FFFFFF" : button.TextColor;
+        var extra = button.Css ?? string.Empty;
+        return $"background-color: {bg}; color: {fg}; padding: 4px 10px; border: none; {extra}";
+    }
+
+}

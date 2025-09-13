@@ -1,0 +1,70 @@
+﻿.top-bar {
+  display: flex;
+  justify-content: space-between;
+  margin-right: 32px;
+  background-color: #6d7fcc;
+  padding: 10px;
+  border-radius: 15px;
+  margin: 24px 0px;
+  border: 1px solid #12182f;
+  color: white;
+}
+
+.top-bar i {
+  font-size: 24px;
+  color: #000;
+  color: white;
+}
+
+
+.file-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.file-input {
+  padding: 0.75rem;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  transition: border-color 0.3s ease;
+}
+
+.file-input:hover {
+  border-color: #0d6efd;
+  cursor: pointer;
+}
+
+.file-input-wrapper i {
+  position: absolute;
+  right: 15px;
+  color: #6c757d;
+  pointer-events: none;
+}
+.instruction {
+  height: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f0ffff;  /* azure */
+  margin-bottom: 20px;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  line-height: 1.5;
+}
+.instruction p{
+  font-size: 16px;
+  font-weight: 500;
+  color: #000;
+}
+.funb-action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top:20px;
+}
+
+
